@@ -41,13 +41,22 @@ jobs:
           gradle-version: "8.9"
 
       - name: Run unit tests
-        run: gradle --no-daemon :app:testDebugUnitTest
+        run: |
+          mkdir -p app/build/reports/ci-logs
+          set -o pipefail
+          gradle --no-daemon :app:testDebugUnitTest --stacktrace --console=plain 2>&1 | tee app/build/reports/ci-logs/unit-tests.log
 
       - name: Run Android lint
-        run: gradle --no-daemon :app:lintDebug
+        run: |
+          mkdir -p app/build/reports/ci-logs
+          set -o pipefail
+          gradle --no-daemon :app:lintDebug --stacktrace --console=plain 2>&1 | tee app/build/reports/ci-logs/lint.log
 
       - name: Build debug APK
-        run: gradle --no-daemon :app:assembleDebug
+        run: |
+          mkdir -p app/build/reports/ci-logs
+          set -o pipefail
+          gradle --no-daemon :app:assembleDebug --stacktrace --console=plain 2>&1 | tee app/build/reports/ci-logs/assemble-debug.log
 
       - name: Create APK checksum
         run: sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/app-debug.apk.sha256
@@ -81,6 +90,15 @@ jobs:
             app/build/reports/tests/
             app/build/reports/lint-results-debug.html
             app/build/reports/lint-results-debug.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload CI logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: novel-library-ci-logs
+          path: app/build/reports/ci-logs/
           if-no-files-found: warn
           retention-days: 14
 
