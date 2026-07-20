@@ -392,7 +392,7 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
             }
             val pendingCandidateCount = candidates.count { it.status.name == "NEEDS_USER_CONFIRMATION" }
             if (pendingCandidateCount > 0) {
-                Text("확인 필요한 후보 $pendingCandidateCount개")
+                Text("확인 필요한 후보 ${pendingCandidateCount}개")
             }
             if (syncJobs.isNotEmpty()) {
                 val running = syncJobs.count { it.status.name == "RUNNING" || it.status.name == "QUEUED" }
