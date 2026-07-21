@@ -63,6 +63,7 @@ import com.personal.novellibrary.scanner.ScanSummary
 import org.json.JSONObject
 import com.personal.novellibrary.scanner.TxtFileScanner
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -76,6 +77,7 @@ import com.personal.novellibrary.ui.NovelLibraryTheme
 
 class LibraryApp : Application()
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     private val db = Room.databaseBuilder(app, NovelDatabase::class.java, NovelDatabase.NAME)
         .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)

@@ -141,7 +141,7 @@ private data class StructuredWorkData(val title: String?, val author: String?, v
 private fun Document.structuredWorkData(): StructuredWorkData? =
     select("script[type=application/ld+json]").firstNotNullOfOrNull { script ->
         runCatching {
-            val root: Any = script.data().trim().let { if (it.startsWith("[")) JSONArray(it) else JSONObject(it) }
+            val root: Any = script.html().trim().let { if (it.startsWith("[")) JSONArray(it) else JSONObject(it) }
             findBookObject(root)?.let { book ->
                 StructuredWorkData(
                     title = book.optString("name").ifBlank { book.optString("headline") }.ifBlank { null },
