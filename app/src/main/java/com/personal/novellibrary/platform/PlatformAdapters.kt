@@ -8,6 +8,8 @@ import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import org.json.JSONArray
+import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
@@ -69,17 +71,31 @@ abstract class PublicHtmlAdapter(
 
     override suspend fun fetchDetails(candidate: SearchCandidate): PlatformWorkInfo = withContext(Dispatchers.IO) {
         val url = candidate.detailUrl ?: return@withContext PlatformWorkInfo(candidate)
-        val document = PlatformHttp.getDocument(url)
+        parseDetailDocument(PlatformHttp.getDocument(url), candidate)
+    }
+
+    internal fun parseDetailDocument(document: Document, candidate: SearchCandidate): PlatformWorkInfo {
+        val structured = document.structuredWorkData()
         val title = document.firstContent("meta[property=og:title]")
             ?: document.firstText("h1", ".title")
+            ?: structured?.title
             ?: candidate.title
         val synopsis = document.firstContent("meta[property=og:description]", "meta[name=description]")
-            ?: document.firstText(".synopsis", ".summary", ".book_intro", ".introduce", "[class*=description]")
+            ?: document.firstText(".synopsis", ".summary", ".book_intro", ".introduce", "[class*=synopsis]", "[class*=description]")
+            ?: structured?.synopsis
             ?: candidate.synopsis
         val image = document.selectFirst("meta[property=og:image]")?.attr("abs:content")?.ifBlank { null }
+            ?: structured?.coverUrl
             ?: candidate.coverUrl
-        val author = document.firstText("[class*=author]", "[class*=writer]") ?: candidate.author
-        PlatformWorkInfo(candidate.copy(title = title.clean(), author = author?.clean(), synopsis = synopsis?.clean(), coverUrl = image))
+        val author = document.firstText("[class*=author]", "[class*=writer]") ?: structured?.author ?: candidate.author
+        return PlatformWorkInfo(
+            candidate.copy(
+                title = title.clean(),
+                author = author?.clean(),
+                synopsis = synopsis?.let(::cleanSynopsis),
+                coverUrl = image,
+            ),
+        )
     }
 
     private fun Element.toCandidate(baseUrl: String): SearchCandidate? {
@@ -124,8 +140,55 @@ private object PlatformHttp {
 
 private fun encoded(query: String): String = URLEncoder.encode(query, Charsets.UTF_8.name())
 private fun String.clean(): String = replace(Regex("\\s+"), " ").trim()
+private fun cleanSynopsis(value: String): String = Jsoup.parse(value).text().clean()
 private fun Document.firstText(vararg selectors: String): String? = selectors.firstNotNullOfOrNull { selectFirst(it)?.text()?.clean()?.ifBlank { null } }
 private fun Document.firstContent(vararg selectors: String): String? = selectors.firstNotNullOfOrNull { selectFirst(it)?.attr("content")?.clean()?.ifBlank { null } }
+
+private data class StructuredWorkData(val title: String?, val author: String?, val synopsis: String?, val coverUrl: String?)
+
+private fun Document.structuredWorkData(): StructuredWorkData? =
+    select("script[type=application/ld+json]").firstNotNullOfOrNull { script ->
+        runCatching {
+            val root: Any = script.html().trim().let { if (it.startsWith("[")) JSONArray(it) else JSONObject(it) }
+            findBookObject(root)?.let { book ->
+                StructuredWorkData(
+                    title = book.optString("name").ifBlank { book.optString("headline") }.ifBlank { null },
+                    author = jsonName(book.opt("author")),
+                    synopsis = book.optString("description").ifBlank { null },
+                    coverUrl = jsonImage(book.opt("image")),
+                )
+            }
+        }.getOrNull()
+    }
+
+private fun findBookObject(value: Any?): JSONObject? = when (value) {
+    is JSONObject -> {
+        if (isWorkType(value.opt("@type"))) value
+        else value.keys().asSequence().mapNotNull { findBookObject(value.opt(it)) }.firstOrNull()
+    }
+    is JSONArray -> (0 until value.length()).asSequence().mapNotNull { findBookObject(value.opt(it)) }.firstOrNull()
+    else -> null
+}
+
+private fun isWorkType(value: Any?): Boolean = when (value) {
+    is JSONArray -> (0 until value.length()).any { isWorkType(value.opt(it)) }
+    is String -> value.equals("Book", true) || value.equals("CreativeWork", true) || value.equals("Novel", true)
+    else -> false
+}
+
+private fun jsonName(value: Any?): String? = when (value) {
+    is JSONObject -> value.optString("name").ifBlank { null }
+    is JSONArray -> (0 until value.length()).asSequence().mapNotNull { jsonName(value.opt(it)) }.firstOrNull()
+    is String -> value.ifBlank { null }
+    else -> null
+}
+
+private fun jsonImage(value: Any?): String? = when (value) {
+    is JSONObject -> value.optString("url").ifBlank { null }
+    is JSONArray -> (0 until value.length()).asSequence().mapNotNull { jsonImage(value.opt(it)) }.firstOrNull()
+    is String -> value.ifBlank { null }
+    else -> null
+}
 
 class NovelpiaAdapter : PublicHtmlAdapter(PlatformType.NOVELPIA, { "https://novelpia.com/search/all/${encoded(it)}" }, Regex("novelpia\\.com/(novel|viewer|comic)/", RegexOption.IGNORE_CASE))
 class MunpiaAdapter : PublicHtmlAdapter(PlatformType.MUNPIA, { "https://www.munpia.com/search?keyword=${encoded(it)}" }, Regex("munpia\\.com/(page/novel|novel/)", RegexOption.IGNORE_CASE))

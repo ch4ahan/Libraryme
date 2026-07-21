@@ -126,7 +126,11 @@ class PlatformSearchWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
             delay(REQUEST_SPACING_MS)
         }
         db.close()
-        return if (failures == registry.adapters.size) Result.retry() else Result.success()
+        return if (failures == registry.adapters.size) {
+            if (shouldRetryPlatformSearch(failures, registry.adapters.size, runAttemptCount)) Result.retry() else Result.failure()
+        } else {
+            Result.success()
+        }
     }
 
     companion object {
@@ -147,7 +151,7 @@ class PlatformSearchWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
             val request = OneTimeWorkRequestBuilder<PlatformSearchWorker>()
                 .setConstraints(
                     Constraints.Builder()
-                        .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
+                        .setRequiredNetworkType(networkTypeForSearch(wifiOnly))
                         .build(),
                 )
                 .setBackoffCriteria(
@@ -174,3 +178,9 @@ class PlatformSearchWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
         }
     }
 }
+
+internal fun networkTypeForSearch(wifiOnly: Boolean): NetworkType =
+    if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
+
+internal fun shouldRetryPlatformSearch(failures: Int, platformCount: Int, runAttemptCount: Int): Boolean =
+    platformCount > 0 && failures == platformCount && runAttemptCount < 2

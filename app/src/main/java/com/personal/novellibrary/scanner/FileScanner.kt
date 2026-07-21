@@ -31,10 +31,12 @@ class TxtFileScanner(private val context: Context, private val dao: NovelDao) {
                 when {
                     document.isDirectory && includeSubfolders -> visit(document)
                     document.isFile && document.name?.endsWith(".txt", ignoreCase = true) == true -> {
+                        val displayTitle = TitleNormalizer.normalize(document.name.orEmpty())
                         records += FileScanRecord(
                             documentUri = document.uri.toString(),
                             originalFileName = document.name.orEmpty(),
-                            normalizedTitle = TitleNormalizer.normalize(document.name.orEmpty()),
+                            normalizedTitle = TitleNormalizer.matchingKey(displayTitle),
+                            displayTitle = displayTitle,
                             fileSize = document.length(),
                             lastModified = document.lastModified(),
                         )
