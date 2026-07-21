@@ -21,6 +21,8 @@ import com.personal.novellibrary.data.PlatformType
 import com.personal.novellibrary.data.SearchCandidateEntity
 import com.personal.novellibrary.data.SyncJobEntity
 import com.personal.novellibrary.platform.PlatformRegistry
+import com.personal.novellibrary.platform.SearchCandidate
+import com.personal.novellibrary.platform.candidateCompleteness
 import com.personal.novellibrary.domain.Candidate
 import com.personal.novellibrary.domain.MatchScorer
 import com.personal.novellibrary.domain.PlatformSearchPolicy
@@ -76,7 +78,10 @@ class PlatformSearchWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
                     } else {
                         var autoMatched = false
                         var proposed = false
-                        candidates.forEach candidateLoop@{ rawCandidate ->
+                        candidates
+                            .rankForDetailLookup(query)
+                            .take(MAX_DETAIL_LOOKUPS_PER_PLATFORM)
+                            .forEach candidateLoop@{ rawCandidate ->
                             val detailed = runCatching { adapter.fetchDetails(rawCandidate).candidate }.getOrDefault(rawCandidate)
                             if (dao.isCandidateExcluded(novelId, adapter.platformType, detailed.workId, detailed.title)) {
                                 return@candidateLoop
@@ -126,7 +131,11 @@ class PlatformSearchWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
             delay(REQUEST_SPACING_MS)
         }
         db.close()
-        return if (failures == registry.adapters.size) Result.retry() else Result.success()
+        return if (failures == registry.adapters.size) {
+            if (shouldRetryPlatformSearch(failures, registry.adapters.size, runAttemptCount)) Result.retry() else Result.failure()
+        } else {
+            Result.success()
+        }
     }
 
     companion object {
@@ -135,6 +144,7 @@ class PlatformSearchWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
         const val KEY_PLATFORMS = "platforms"
         const val KEY_FORCE_REFRESH = "forceRefresh"
         private const val REQUEST_SPACING_MS = 750L
+        private const val MAX_DETAIL_LOOKUPS_PER_PLATFORM = 3
 
         fun enqueue(
             context: Context,
@@ -147,7 +157,7 @@ class PlatformSearchWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
             val request = OneTimeWorkRequestBuilder<PlatformSearchWorker>()
                 .setConstraints(
                     Constraints.Builder()
-                        .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
+                        .setRequiredNetworkType(networkTypeForSearch(wifiOnly))
                         .build(),
                 )
                 .setBackoffCriteria(
@@ -174,3 +184,17 @@ class PlatformSearchWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
         }
     }
 }
+
+internal fun networkTypeForSearch(wifiOnly: Boolean): NetworkType =
+    if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
+
+internal fun shouldRetryPlatformSearch(failures: Int, platformCount: Int, runAttemptCount: Int): Boolean =
+    platformCount > 0 && failures == platformCount && runAttemptCount < 2
+
+/** Prioritizes likely title matches before performing comparatively expensive detail requests. */
+internal fun List<SearchCandidate>.rankForDetailLookup(query: String): List<SearchCandidate> =
+    sortedWith(
+        compareByDescending<SearchCandidate> {
+            MatchScorer.score(query, Candidate(it.title, it.author, it.genre))
+        }.thenByDescending(::candidateCompleteness),
+    )

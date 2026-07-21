@@ -11,6 +11,7 @@ import org.jsoup.nodes.Element
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
+import java.net.URI
 import java.util.concurrent.TimeUnit
 
 data class SearchCandidate(
@@ -66,6 +67,7 @@ abstract class PublicHtmlAdapter(
             .asSequence()
             .mapNotNull { it.toCandidate(document.location()) }
             .distinctBy { it.detailUrl }
+            .sortedByDescending { candidateCompleteness(it) }
             .take(MAX_CANDIDATES)
             .toList()
 
@@ -88,11 +90,19 @@ abstract class PublicHtmlAdapter(
             ?: structured?.coverUrl
             ?: candidate.coverUrl
         val author = document.firstText("[class*=author]", "[class*=writer]") ?: structured?.author ?: candidate.author
-        return PlatformWorkInfo(candidate.copy(title = title.clean(), author = author?.clean(), synopsis = synopsis?.clean(), coverUrl = image))
+        return PlatformWorkInfo(
+            candidate.copy(
+                title = title.clean(),
+                author = author?.clean(),
+                synopsis = synopsis?.let(::cleanSynopsis),
+                coverUrl = image,
+            ),
+        )
     }
 
     private fun Element.toCandidate(baseUrl: String): SearchCandidate? {
-        val absoluteUrl = absUrl("href").ifBlank { runCatching { java.net.URI(baseUrl).resolve(attr("href")).toString() }.getOrNull().orEmpty() }
+        val absoluteUrl = absUrl("href").ifBlank { runCatching { URI(baseUrl).resolve(attr("href")).toString() }.getOrNull().orEmpty() }
+        if (!absoluteUrl.isSafePublicUrl()) return null
         if (!workLink.containsMatchIn(absoluteUrl)) return null
         val card = closest("li, article, [class*=item], [class*=book], [class*=content]") ?: parent()
         val title = attr("title").ifBlank {
@@ -126,13 +136,28 @@ private object PlatformHttp {
             if (!response.isSuccessful) error("HTTP ${response.code}")
             val body = response.body?.string() ?: error("빈 응답")
             if (body.isBlank()) error("빈 응답")
-            return Jsoup.parse(body, response.request.url.toString())
+            val document = Jsoup.parse(body, response.request.url.toString())
+            val pageText = document.text().lowercase()
+            if (pageText.contains("captcha") || pageText.contains("비정상적인 접근") ||
+                pageText.contains("access denied") || pageText.contains("로봇이 아닙니다")
+            ) {
+                error("플랫폼이 자동 조회를 차단했습니다")
+            }
+            return document
         }
     }
 }
 
 private fun encoded(query: String): String = URLEncoder.encode(query, Charsets.UTF_8.name())
 private fun String.clean(): String = replace(Regex("\\s+"), " ").trim()
+private fun cleanSynopsis(value: String): String = Jsoup.parse(value).text().clean()
+private fun String.isSafePublicUrl(): Boolean = runCatching {
+    val uri = URI(this)
+    uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()
+}.getOrDefault(false)
+
+internal fun candidateCompleteness(candidate: SearchCandidate): Int =
+    listOf(candidate.author, candidate.synopsis, candidate.coverUrl).count { !it.isNullOrBlank() }
 private fun Document.firstText(vararg selectors: String): String? = selectors.firstNotNullOfOrNull { selectFirst(it)?.text()?.clean()?.ifBlank { null } }
 private fun Document.firstContent(vararg selectors: String): String? = selectors.firstNotNullOfOrNull { selectFirst(it)?.attr("content")?.clean()?.ifBlank { null } }
 
@@ -155,12 +180,17 @@ private fun Document.structuredWorkData(): StructuredWorkData? =
 
 private fun findBookObject(value: Any?): JSONObject? = when (value) {
     is JSONObject -> {
-        val type = value.optString("@type")
-        if (type.equals("Book", true) || type.equals("CreativeWork", true)) value
+        if (isWorkType(value.opt("@type"))) value
         else value.keys().asSequence().mapNotNull { findBookObject(value.opt(it)) }.firstOrNull()
     }
     is JSONArray -> (0 until value.length()).asSequence().mapNotNull { findBookObject(value.opt(it)) }.firstOrNull()
     else -> null
+}
+
+private fun isWorkType(value: Any?): Boolean = when (value) {
+    is JSONArray -> (0 until value.length()).any { isWorkType(value.opt(it)) }
+    is String -> value.equals("Book", true) || value.equals("CreativeWork", true) || value.equals("Novel", true)
+    else -> false
 }
 
 private fun jsonName(value: Any?): String? = when (value) {
