@@ -1,0 +1,1107 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 4,
+    "identityHash": "b349b242f0450ee770feb17b43bb8e84",
+    "entities": [
+      {
+        "tableName": "NovelEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `displayTitle` TEXT NOT NULL, `normalizedTitle` TEXT NOT NULL, `confirmedTitle` TEXT, `author` TEXT, `mainGenre` TEXT NOT NULL, `synopsis` TEXT, `serializationStatus` TEXT, `isCompleted` INTEGER, `coverUrl` TEXT, `isFavorite` INTEGER NOT NULL, `readingStatus` TEXT NOT NULL, `personalRating` REAL, `memo` TEXT, `readingStartedAt` INTEGER, `completedAt` INTEGER, `droppedAt` INTEGER, `lastReadChapter` TEXT, `rereadCount` INTEGER NOT NULL, `readingNote` TEXT, `manualSourceNote` TEXT, `isHidden` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, `isInfoLocked` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastViewedAt` INTEGER, `lastFetchedAt` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayTitle",
+            "columnName": "displayTitle",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedTitle",
+            "columnName": "normalizedTitle",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confirmedTitle",
+            "columnName": "confirmedTitle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "author",
+            "columnName": "author",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mainGenre",
+            "columnName": "mainGenre",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "synopsis",
+            "columnName": "synopsis",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "serializationStatus",
+            "columnName": "serializationStatus",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isCompleted",
+            "columnName": "isCompleted",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "coverUrl",
+            "columnName": "coverUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isFavorite",
+            "columnName": "isFavorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "readingStatus",
+            "columnName": "readingStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "personalRating",
+            "columnName": "personalRating",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "memo",
+            "columnName": "memo",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "readingStartedAt",
+            "columnName": "readingStartedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "completedAt",
+            "columnName": "completedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "droppedAt",
+            "columnName": "droppedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastReadChapter",
+            "columnName": "lastReadChapter",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "rereadCount",
+            "columnName": "rereadCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "readingNote",
+            "columnName": "readingNote",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "manualSourceNote",
+            "columnName": "manualSourceNote",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isHidden",
+            "columnName": "isHidden",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isDeleted",
+            "columnName": "isDeleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isInfoLocked",
+            "columnName": "isInfoLocked",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastViewedAt",
+            "columnName": "lastViewedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastFetchedAt",
+            "columnName": "lastFetchedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_NovelEntity_normalizedTitle",
+            "unique": false,
+            "columnNames": [
+              "normalizedTitle"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_NovelEntity_normalizedTitle` ON `${TABLE_NAME}` (`normalizedTitle`)"
+          },
+          {
+            "name": "index_NovelEntity_author",
+            "unique": false,
+            "columnNames": [
+              "author"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_NovelEntity_author` ON `${TABLE_NAME}` (`author`)"
+          },
+          {
+            "name": "index_NovelEntity_mainGenre",
+            "unique": false,
+            "columnNames": [
+              "mainGenre"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_NovelEntity_mainGenre` ON `${TABLE_NAME}` (`mainGenre`)"
+          },
+          {
+            "name": "index_NovelEntity_isFavorite",
+            "unique": false,
+            "columnNames": [
+              "isFavorite"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_NovelEntity_isFavorite` ON `${TABLE_NAME}` (`isFavorite`)"
+          },
+          {
+            "name": "index_NovelEntity_readingStatus",
+            "unique": false,
+            "columnNames": [
+              "readingStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_NovelEntity_readingStatus` ON `${TABLE_NAME}` (`readingStatus`)"
+          },
+          {
+            "name": "index_NovelEntity_lastFetchedAt",
+            "unique": false,
+            "columnNames": [
+              "lastFetchedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_NovelEntity_lastFetchedAt` ON `${TABLE_NAME}` (`lastFetchedAt`)"
+          },
+          {
+            "name": "index_NovelEntity_isDeleted",
+            "unique": false,
+            "columnNames": [
+              "isDeleted"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_NovelEntity_isDeleted` ON `${TABLE_NAME}` (`isDeleted`)"
+          },
+          {
+            "name": "index_NovelEntity_isInfoLocked",
+            "unique": false,
+            "columnNames": [
+              "isInfoLocked"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_NovelEntity_isInfoLocked` ON `${TABLE_NAME}` (`isInfoLocked`)"
+          }
+        ]
+      },
+      {
+        "tableName": "LocalFileEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `novelId` INTEGER NOT NULL, `documentUri` TEXT NOT NULL, `originalFileName` TEXT NOT NULL, `fileSize` INTEGER NOT NULL, `lastModified` INTEGER NOT NULL, `isAvailable` INTEGER NOT NULL, `lastScannedAt` INTEGER NOT NULL, FOREIGN KEY(`novelId`) REFERENCES `NovelEntity`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "novelId",
+            "columnName": "novelId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "documentUri",
+            "columnName": "documentUri",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalFileName",
+            "columnName": "originalFileName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileSize",
+            "columnName": "fileSize",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isAvailable",
+            "columnName": "isAvailable",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastScannedAt",
+            "columnName": "lastScannedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_LocalFileEntity_novelId",
+            "unique": false,
+            "columnNames": [
+              "novelId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_LocalFileEntity_novelId` ON `${TABLE_NAME}` (`novelId`)"
+          },
+          {
+            "name": "index_LocalFileEntity_documentUri",
+            "unique": true,
+            "columnNames": [
+              "documentUri"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_LocalFileEntity_documentUri` ON `${TABLE_NAME}` (`documentUri`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "NovelEntity",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "novelId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "PlatformListingEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `novelId` INTEGER NOT NULL, `platformType` TEXT NOT NULL, `platformWorkId` TEXT, `platformTitle` TEXT, `platformAuthor` TEXT, `synopsis` TEXT, `genre` TEXT, `tags` TEXT, `status` TEXT, `rating` REAL, `ratingCount` INTEGER, `reviewCount` INTEGER, `coverUrl` TEXT, `detailUrl` TEXT, `matchConfidence` INTEGER NOT NULL, `lookupStatus` TEXT NOT NULL, `lastFetchedAt` INTEGER, `errorMessage` TEXT, `isExcluded` INTEGER NOT NULL, FOREIGN KEY(`novelId`) REFERENCES `NovelEntity`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "novelId",
+            "columnName": "novelId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "platformType",
+            "columnName": "platformType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "platformWorkId",
+            "columnName": "platformWorkId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "platformTitle",
+            "columnName": "platformTitle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "platformAuthor",
+            "columnName": "platformAuthor",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "synopsis",
+            "columnName": "synopsis",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "genre",
+            "columnName": "genre",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "tags",
+            "columnName": "tags",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "rating",
+            "columnName": "rating",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "ratingCount",
+            "columnName": "ratingCount",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "reviewCount",
+            "columnName": "reviewCount",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "coverUrl",
+            "columnName": "coverUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "detailUrl",
+            "columnName": "detailUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "matchConfidence",
+            "columnName": "matchConfidence",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lookupStatus",
+            "columnName": "lookupStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastFetchedAt",
+            "columnName": "lastFetchedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "errorMessage",
+            "columnName": "errorMessage",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isExcluded",
+            "columnName": "isExcluded",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_PlatformListingEntity_novelId",
+            "unique": false,
+            "columnNames": [
+              "novelId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_PlatformListingEntity_novelId` ON `${TABLE_NAME}` (`novelId`)"
+          },
+          {
+            "name": "index_PlatformListingEntity_platformType",
+            "unique": false,
+            "columnNames": [
+              "platformType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_PlatformListingEntity_platformType` ON `${TABLE_NAME}` (`platformType`)"
+          },
+          {
+            "name": "index_PlatformListingEntity_lookupStatus",
+            "unique": false,
+            "columnNames": [
+              "lookupStatus"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_PlatformListingEntity_lookupStatus` ON `${TABLE_NAME}` (`lookupStatus`)"
+          },
+          {
+            "name": "index_PlatformListingEntity_novelId_platformType",
+            "unique": true,
+            "columnNames": [
+              "novelId",
+              "platformType"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_PlatformListingEntity_novelId_platformType` ON `${TABLE_NAME}` (`novelId`, `platformType`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "NovelEntity",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "novelId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ReviewSnapshotEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `platformListingId` INTEGER NOT NULL, `reviewText` TEXT NOT NULL, `reviewRating` REAL, `reviewerDisplayName` TEXT, `reviewDate` TEXT, `sortOrder` INTEGER NOT NULL, `fetchedAt` INTEGER NOT NULL, FOREIGN KEY(`platformListingId`) REFERENCES `PlatformListingEntity`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "platformListingId",
+            "columnName": "platformListingId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reviewText",
+            "columnName": "reviewText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reviewRating",
+            "columnName": "reviewRating",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "reviewerDisplayName",
+            "columnName": "reviewerDisplayName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "reviewDate",
+            "columnName": "reviewDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetchedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ReviewSnapshotEntity_platformListingId",
+            "unique": false,
+            "columnNames": [
+              "platformListingId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ReviewSnapshotEntity_platformListingId` ON `${TABLE_NAME}` (`platformListingId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "PlatformListingEntity",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "platformListingId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "AliasEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `novelId` INTEGER NOT NULL, `alias` TEXT NOT NULL, `aliasType` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, FOREIGN KEY(`novelId`) REFERENCES `NovelEntity`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "novelId",
+            "columnName": "novelId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alias",
+            "columnName": "alias",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aliasType",
+            "columnName": "aliasType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_AliasEntity_novelId",
+            "unique": false,
+            "columnNames": [
+              "novelId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_AliasEntity_novelId` ON `${TABLE_NAME}` (`novelId`)"
+          },
+          {
+            "name": "index_AliasEntity_alias",
+            "unique": false,
+            "columnNames": [
+              "alias"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_AliasEntity_alias` ON `${TABLE_NAME}` (`alias`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "NovelEntity",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "novelId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "UserTagEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_UserTagEntity_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_UserTagEntity_name` ON `${TABLE_NAME}` (`name`)"
+          }
+        ]
+      },
+      {
+        "tableName": "NovelUserTagCrossRef",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`novelId` INTEGER NOT NULL, `tagId` INTEGER NOT NULL, PRIMARY KEY(`novelId`, `tagId`))",
+        "fields": [
+          {
+            "fieldPath": "novelId",
+            "columnName": "novelId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tagId",
+            "columnName": "tagId",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "novelId",
+            "tagId"
+          ]
+        }
+      },
+      {
+        "tableName": "CollectionEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `description` TEXT, `collectionType` TEXT NOT NULL, `filterJson` TEXT, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "collectionType",
+            "columnName": "collectionType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "filterJson",
+            "columnName": "filterJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "CollectionItemEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`collectionId` INTEGER NOT NULL, `novelId` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, PRIMARY KEY(`collectionId`, `novelId`))",
+        "fields": [
+          {
+            "fieldPath": "collectionId",
+            "columnName": "collectionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "novelId",
+            "columnName": "novelId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "addedAt",
+            "columnName": "addedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "collectionId",
+            "novelId"
+          ]
+        }
+      },
+      {
+        "tableName": "SearchCandidateEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `novelId` INTEGER NOT NULL, `platformType` TEXT NOT NULL, `candidateTitle` TEXT NOT NULL, `candidateAuthor` TEXT, `candidateSynopsis` TEXT, `candidateGenre` TEXT, `candidateCoverUrl` TEXT, `candidateWorkId` TEXT, `confidence` INTEGER NOT NULL, `status` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "novelId",
+            "columnName": "novelId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "platformType",
+            "columnName": "platformType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateTitle",
+            "columnName": "candidateTitle",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateAuthor",
+            "columnName": "candidateAuthor",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "candidateSynopsis",
+            "columnName": "candidateSynopsis",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "candidateGenre",
+            "columnName": "candidateGenre",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "candidateCoverUrl",
+            "columnName": "candidateCoverUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "candidateWorkId",
+            "columnName": "candidateWorkId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "ExcludedCandidateEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `novelId` INTEGER NOT NULL, `platformType` TEXT NOT NULL, `candidateWorkId` TEXT, `candidateTitle` TEXT NOT NULL, `reason` TEXT, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "novelId",
+            "columnName": "novelId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "platformType",
+            "columnName": "platformType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateWorkId",
+            "columnName": "candidateWorkId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "candidateTitle",
+            "columnName": "candidateTitle",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "SyncJobEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `novelId` INTEGER NOT NULL, `platformType` TEXT NOT NULL, `jobType` TEXT NOT NULL, `status` TEXT NOT NULL, `attemptCount` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `startedAt` INTEGER, `finishedAt` INTEGER, `errorMessage` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "novelId",
+            "columnName": "novelId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "platformType",
+            "columnName": "platformType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "jobType",
+            "columnName": "jobType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attemptCount",
+            "columnName": "attemptCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "finishedAt",
+            "columnName": "finishedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "errorMessage",
+            "columnName": "errorMessage",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "ChangeHistoryEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `novelId` INTEGER NOT NULL, `actionType` TEXT NOT NULL, `beforeValue` TEXT, `afterValue` TEXT, `createdAt` INTEGER NOT NULL, `isUndoable` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "novelId",
+            "columnName": "novelId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actionType",
+            "columnName": "actionType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "beforeValue",
+            "columnName": "beforeValue",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "afterValue",
+            "columnName": "afterValue",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isUndoable",
+            "columnName": "isUndoable",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "TrashEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `novelId` INTEGER NOT NULL, `deletedAt` INTEGER NOT NULL, `scheduledPurgeAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "novelId",
+            "columnName": "novelId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletedAt",
+            "columnName": "deletedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scheduledPurgeAt",
+            "columnName": "scheduledPurgeAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b349b242f0450ee770feb17b43bb8e84')"
+    ]
+  }
+}
