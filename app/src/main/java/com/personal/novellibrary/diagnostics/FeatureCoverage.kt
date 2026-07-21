@@ -23,7 +23,7 @@ object PrdCoverage {
         FeatureCoverageItem("로컬 라이브러리 UI", 94, "Core screens and result inspection are connected; scanning, backup/restore/export, and platform jobs expose progress bars."),
         FeatureCoverageItem("관리 기능", 93, "User data, trash, reading records, collections, tags, and locked manual metadata editing are connected to Room."),
         FeatureCoverageItem("스마트 컬렉션/추천", 75, "Rule matcher and recommendation engine exist; persisted smart collection UI remains pending."),
-        FeatureCoverageItem("플랫폼 검색", 90, "Five adapters, cache/exclusion controls, custom per-work queries, result inspection and source-page opening exist; device validation remains pending."),
+        FeatureCoverageItem("플랫폼 검색", 90, "Five public-page adapters never generate fake data (가짜 데이터 없음); cache/exclusion controls, structured synopsis extraction, result inspection and source-page opening exist; device validation remains pending."),
         FeatureCoverageItem("백업/복원/내보내기", 90, "ZIP/CSV/JSON export and bounded, validated merge restore are connected to UI."),
         FeatureCoverageItem("진단/설정", 90, "Persisted scan/search settings and diagnostic display/copy/permission actions are connected to UI."),
         FeatureCoverageItem("테스트", 85, "JVM, migration, UI, 2k/10k repeated-scan, and five-platform live smoke tests run in scheduled emulator CI; physical-device coverage remains pending."),
