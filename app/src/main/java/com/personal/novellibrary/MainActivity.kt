@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -70,6 +71,7 @@ import kotlinx.coroutines.withContext
 import com.personal.novellibrary.worker.PlatformSearchWorker
 import com.personal.novellibrary.settings.LibrarySettings
 import com.personal.novellibrary.settings.LibrarySettingsStore
+import com.personal.novellibrary.ui.NovelLibraryTheme
 
 class LibraryApp : Application()
 
@@ -334,7 +336,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MaterialTheme { NovelLibraryApp() } }
+        setContent { NovelLibraryTheme { NovelLibraryApp() } }
     }
 }
 
@@ -379,10 +381,18 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
         uri?.let { vm.restoreBackup(it, RestoreMode.MERGE) }
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Novel Library") }) }) { padding ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { TopAppBar(title = { Column { Text("Novel Library"); Text("나만의 이야기 서재", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } }) },
+    ) { padding ->
         Column(Modifier.padding(padding).padding(16.dp)) {
-            Text("전체 작품 $count · 로컬 DB 우선 TXT 라이브러리")
-            Text("기능 골격 ${PrdCoverage.overallPercent}% · 상용 준비도 ${PrdCoverage.commercialReadinessPercent}%")
+            Card(Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = RoundedCornerShape(24.dp)) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("내 서재", style = MaterialTheme.typography.headlineMedium)
+                    Text("$count개의 이야기가 기다리고 있어요", style = MaterialTheme.typography.bodyLarge)
+                    Text("TXT는 기기에 안전하게 두고 작품 정보만 정리해요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { showTrash = false }) { Text("라이브러리") }
                 Button(onClick = { showTrash = true; selectedNovelIds = emptySet() }) { Text("휴지통 ${trash.size}") }
@@ -477,6 +487,8 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                     vm.search(it)
                 },
                 label = { Text("통합 검색") },
+                placeholder = { Text("제목, 작가, 줄거리, 태그를 찾아보세요") },
+                shape = RoundedCornerShape(18.dp),
                 modifier = Modifier.fillMaxWidth(),
             )
             if (selectedNovelIds.isNotEmpty()) {
@@ -503,8 +515,8 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
             val visibleNovels = if (showTrash) trash else LibraryFilterEngine.apply(novels, LibraryFilter(genre = genreFilter, favoriteOnly = favoriteOnly))
             LazyColumn {
                 items(visibleNovels, key = { it.id }) { novel ->
-                    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Column(Modifier.padding(12.dp)) {
+                    Card(Modifier.fillMaxWidth().padding(vertical = 6.dp), shape = RoundedCornerShape(20.dp)) {
+                        Column(Modifier.padding(16.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(novel.confirmedTitle ?: novel.displayTitle, style = MaterialTheme.typography.titleMedium)
                                 Text(if (novel.isFavorite) "♥" else "♡")

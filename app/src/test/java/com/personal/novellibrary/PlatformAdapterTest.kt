@@ -28,6 +28,7 @@ class PlatformAdapterTest {
         assertEquals(PlatformType.NAVER_SERIES, candidates.single().platformType)
         assertEquals("악녀는 두 번 산다", candidates.single().title)
         assertEquals("한민트", candidates.single().author)
+        assertEquals("회귀한 주인공의 이야기", candidates.single().synopsis)
         assertTrue(candidates.single().detailUrl!!.contains("productNo=123"))
     }
 }
