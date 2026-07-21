@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -56,6 +58,7 @@ import com.personal.novellibrary.domain.RecommendationEngine
 import com.personal.novellibrary.domain.LibraryFilter
 import com.personal.novellibrary.domain.LibraryFilterEngine
 import com.personal.novellibrary.domain.RecommendationRule
+import com.personal.novellibrary.domain.TitleNormalizer
 import com.personal.novellibrary.diagnostics.DiagnosticsService
 import com.personal.novellibrary.diagnostics.PrdCoverage
 import com.personal.novellibrary.repository.LibraryRepository
@@ -285,7 +288,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
             PlatformSearchWorker.enqueue(
                 context = getApplication(),
                 novelId = novel.id,
-                query = novel.confirmedTitle ?: novel.normalizedTitle.ifBlank { novel.displayTitle },
+                query = TitleNormalizer.platformQuery(novel.confirmedTitle ?: novel.normalizedTitle.ifBlank { novel.displayTitle }),
                 enabledPlatforms = settings.value.enabledPlatforms,
                 wifiOnly = settings.value.wifiOnlyBulkSearch,
                 forceRefresh = forceRefresh,
@@ -293,15 +296,30 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun findMissingSynopses() {
+        val ids = novels.value.asSequence()
+            .filter { it.synopsis.isNullOrBlank() }
+            .map { it.id }
+            .toSet()
+        if (ids.isEmpty()) {
+            _operationMessage.value = "모든 작품에 줄거리가 있어요."
+            return
+        }
+        startPlatformSearch(ids)
+        _operationMessage.value = "줄거리 없는 작품 ${ids.size}권을 검색 대기열에 넣었어요."
+    }
+
     fun startPlatformSearch(novelId: Long, customQuery: String, forceRefresh: Boolean = false) {
         val novel = novels.value.firstOrNull { it.id == novelId } ?: return
-        val searchQuery = customQuery.trim().ifBlank {
+        val searchQuery = TitleNormalizer.platformQuery(customQuery.trim().ifBlank {
             novel.confirmedTitle ?: novel.normalizedTitle.ifBlank { novel.displayTitle }
-        }
+        })
         PlatformSearchWorker.enqueue(
             context = getApplication(), novelId = novelId, query = searchQuery,
             enabledPlatforms = settings.value.enabledPlatforms,
-            wifiOnly = settings.value.wifiOnlyBulkSearch, forceRefresh = forceRefresh,
+            // A user-triggered single-work lookup must start on any connected network.
+            // The Wi-Fi-only preference applies only to bulk searches.
+            wifiOnly = false, forceRefresh = forceRefresh,
         )
         _operationMessage.value = "‘$searchQuery’ 플랫폼 검색을 예약했습니다."
     }
@@ -370,6 +388,7 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
     var favoriteOnly by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showDiagnostics by remember { mutableStateOf(false) }
+    var showTools by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         uri?.let(vm::scan)
@@ -399,7 +418,7 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                     Text("TXT는 기기에 안전하게 두고 작품 정보만 정리해요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { showTrash = false }) { Text("라이브러리") }
                 Button(onClick = { showTrash = true; selectedNovelIds = emptySet() }) { Text("휴지통 ${trash.size}") }
             }
@@ -435,17 +454,23 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                 Text("플랫폼 검색 진행 $completedJobs/${recentJobs.size}")
                 LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { picker.launch(null) }) { Text("TXT 폴더 선택/스캔") }
-                Button(onClick = { showDiagnostics = !showDiagnostics; vm.refreshDiagnostics() }) { Text("진단") }
-                Button(onClick = { showSettings = !showSettings }) { Text("설정") }
+                Button(onClick = vm::findMissingSynopses) { Text("줄거리 없는 작품 찾기") }
                 Button(onClick = { recommendedNovelId = vm.recommendToday() }) { Text("오늘 뭐 읽지?") }
-                Button(onClick = { backupExporter.launch("novel-library-backup.zip") }) { Text("백업") }
-                Button(onClick = { backupImporter.launch(arrayOf("application/zip", "application/octet-stream")) }) { Text("복원") }
-                Button(onClick = { csvExporter.launch("novel-library.csv") }) { Text("CSV") }
-                Button(onClick = { vm.createFavoriteUnreadSmartCollection() }) { Text("스마트 컬렉션") }
+                TextButton(onClick = { showTools = !showTools }) { Text(if (showTools) "도구 닫기" else "백업·설정") }
             }
-            if (showSettings) {
+            if (showTools) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { showSettings = !showSettings }) { Text("설정") }
+                    TextButton(onClick = { showDiagnostics = !showDiagnostics; vm.refreshDiagnostics() }) { Text("진단") }
+                    TextButton(onClick = { backupExporter.launch("novel-library-backup.zip") }) { Text("백업") }
+                    TextButton(onClick = { backupImporter.launch(arrayOf("application/zip", "application/octet-stream")) }) { Text("복원") }
+                    TextButton(onClick = { csvExporter.launch("novel-library.csv") }) { Text("CSV") }
+                    TextButton(onClick = { vm.createFavoriteUnreadSmartCollection() }) { Text("스마트 컬렉션") }
+                }
+            }
+            if (showTools && showSettings) {
                 Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Column(Modifier.padding(12.dp)) {
                         Text("스캔 및 검색 설정", style = MaterialTheme.typography.titleMedium)
@@ -462,7 +487,7 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                     }
                 }
             }
-            if (showDiagnostics) {
+            if (showTools && showDiagnostics) {
                 Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Column(Modifier.padding(12.dp)) {
                         Text("앱 상태 진단", style = MaterialTheme.typography.titleMedium)
@@ -480,7 +505,7 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Button(onClick = { genreFilter = null; favoriteOnly = false }) { Text("전체") }
                 Button(onClick = { genreFilter = Genre.ROMANCE_FANTASY }) { Text("로판") }
                 Button(onClick = { genreFilter = Genre.BL }) { Text("BL") }
@@ -499,7 +524,7 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
             )
             if (selectedNovelIds.isNotEmpty()) {
                 Text("선택한 작품 ${selectedNovelIds.size}개")
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Button(onClick = { vm.bulkFavorite(selectedNovelIds, true) }) { Text("일괄 즐겨찾기") }
                     Button(onClick = { vm.bulkStatus(selectedNovelIds, ReadingStatus.PLAN_TO_READ) }) { Text("일괄 읽을 예정") }
                     Button(onClick = { vm.bulkTrash(selectedNovelIds); selectedNovelIds = emptySet() }) { Text("휴지통") }
@@ -519,7 +544,7 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                 }
             }
             val visibleNovels = if (showTrash) trash else LibraryFilterEngine.apply(novels, LibraryFilter(genre = genreFilter, favoriteOnly = favoriteOnly))
-            LazyColumn {
+            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 items(visibleNovels, key = { it.id }) { novel ->
                     Card(Modifier.fillMaxWidth().padding(vertical = 6.dp), shape = RoundedCornerShape(20.dp)) {
                         Column(Modifier.padding(16.dp)) {
@@ -528,8 +553,41 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                                 Text(if (novel.isFavorite) "♥" else "♡")
                             }
                             Text("${novel.author ?: "작가 미확인"} · ${novel.mainGenre} · ${novel.readingStatus}")
-                            novel.synopsis?.let { Text(it, maxLines = 3) }
-                            Row {
+                            if (novel.synopsis.isNullOrBlank()) {
+                                Text(
+                                    "아직 저장된 줄거리가 없어요.",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                TextButton({
+                                    vm.startPlatformSearch(
+                                        novel.id,
+                                        novel.confirmedTitle ?: novel.normalizedTitle.ifBlank { novel.displayTitle },
+                                        forceRefresh = true,
+                                    )
+                                }) { Text("줄거리 찾아오기") }
+                            } else {
+                                Text("줄거리", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                                Text(novel.synopsis, maxLines = if (expandedNovelId == novel.id) 12 else 4)
+                            }
+                            syncJobs.firstOrNull { it.novelId == novel.id }?.let { job ->
+                                if (job.status.name == "QUEUED" || job.status.name == "RUNNING") {
+                                    Text("${job.platformType}에서 줄거리를 찾는 중…", style = MaterialTheme.typography.labelMedium)
+                                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                                }
+                            }
+                            candidates.firstOrNull {
+                                it.novelId == novel.id && it.status.name == "NEEDS_USER_CONFIRMATION" && !it.candidateSynopsis.isNullOrBlank()
+                            }?.let { candidate ->
+                                Card(Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(12.dp)) {
+                                    Column(Modifier.padding(12.dp)) {
+                                        Text("검색된 줄거리 후보", style = MaterialTheme.typography.labelLarge)
+                                        Text(candidate.candidateSynopsis.orEmpty(), maxLines = 5)
+                                        TextButton({ vm.acceptCandidate(candidate.id) }) { Text("이 줄거리 저장") }
+                                    }
+                                }
+                            }
+                            Row(Modifier.horizontalScroll(rememberScrollState())) {
                                 if (showTrash) {
                                     TextButton({ vm.restore(novel.id) }) { Text("복원") }
                                 } else {
@@ -549,7 +607,7 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                                             vm.loadUserTags(novel.id)
                                             vm.loadPlatformListings(novel.id)
                                         }
-                                    }) { Text("상세/편집") }
+                                    }) { Text("줄거리/상세") }
                                 }
                             }
                             if (expandedNovelId == novel.id) {

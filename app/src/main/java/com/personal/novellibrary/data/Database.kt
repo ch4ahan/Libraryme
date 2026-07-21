@@ -8,6 +8,7 @@ data class FileScanRecord(
     val documentUri: String,
     val originalFileName: String,
     val normalizedTitle: String,
+    val displayTitle: String = normalizedTitle,
     val fileSize: Long,
     val lastModified: Long,
 )
@@ -76,6 +77,9 @@ interface NovelDao {
     )
     suspend fun updateFileSnapshot(id: Long, fileSize: Long, lastModified: Long, now: Long = System.currentTimeMillis())
 
+    @Query("UPDATE NovelEntity SET displayTitle = :displayTitle, normalizedTitle = :normalizedTitle, updatedAt = :now WHERE id = :novelId AND confirmedTitle IS NULL AND isInfoLocked = 0")
+    suspend fun updateScannedTitle(novelId: Long, displayTitle: String, normalizedTitle: String, now: Long = System.currentTimeMillis())
+
     @Query("UPDATE LocalFileEntity SET isAvailable = 0, lastScannedAt = :now WHERE documentUri NOT IN (:uris)")
     suspend fun markMissingExcept(uris: List<String>, now: Long = System.currentTimeMillis())
 
@@ -92,11 +96,8 @@ interface NovelDao {
         records.forEach { record ->
             val existing = existingByUri[record.documentUri]
             if (existing == null) {
-                val novelId = upsertNovel(
-                    NovelEntity(
-                        displayTitle = record.normalizedTitle.ifBlank { record.originalFileName },
-                        normalizedTitle = record.normalizedTitle,
-                    ),
+                val novelId = novelByNormalizedTitle(record.normalizedTitle)?.id ?: upsertNovel(
+                    NovelEntity(displayTitle = record.displayTitle.ifBlank { record.originalFileName }, normalizedTitle = record.normalizedTitle),
                 )
                 upsertFile(
                     LocalFileEntity(
@@ -110,6 +111,7 @@ interface NovelDao {
                 )
                 inserted++
             } else {
+                updateScannedTitle(existing.novelId, record.displayTitle, record.normalizedTitle, now)
                 val wasChanged = existing.fileSize != record.fileSize ||
                     existing.lastModified != record.lastModified || !existing.isAvailable
                 updateFileSnapshot(existing.id, record.fileSize, record.lastModified, now)

@@ -56,4 +56,20 @@ class PlatformAdapterTest {
         assertEquals("재벌가의 비서가 막내아들로 다시 태어난다.", result.synopsis)
         assertEquals("https://example.test/cover.jpg", result.coverUrl)
     }
+
+    @Test
+    fun detailParserSupportsGraphTypeArraysAndCleansSynopsisHtml() {
+        val html = """
+            <script type="application/ld+json">
+              {"@graph":[{"@type":["Thing","Book"],"name":"그래프 작품",
+              "description":"<p>첫 문장</p><p>두 번째 문장</p>"}]}
+            </script>
+        """.trimIndent()
+        val original = SearchCandidate(PlatformType.NAVER_SERIES, "임시", null, null, null, null, null, null)
+
+        val result = NaverSeriesAdapter().parseDetailDocument(Jsoup.parse(html), original).candidate
+
+        assertEquals("그래프 작품", result.title)
+        assertEquals("첫 문장 두 번째 문장", result.synopsis)
+    }
 }
