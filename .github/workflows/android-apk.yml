@@ -44,6 +44,16 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Verify merge integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- .github app/src; then
+            echo "Unresolved merge marker detected." >&2
+            exit 1
+          fi
+          git diff --check
+
       - name: Test, lint, and build debug APK
         run: |
           mkdir -p app/build/reports/ci-logs
