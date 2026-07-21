@@ -88,7 +88,14 @@ abstract class PublicHtmlAdapter(
             ?: structured?.coverUrl
             ?: candidate.coverUrl
         val author = document.firstText("[class*=author]", "[class*=writer]") ?: structured?.author ?: candidate.author
-        return PlatformWorkInfo(candidate.copy(title = title.clean(), author = author?.clean(), synopsis = synopsis?.clean(), coverUrl = image))
+        return PlatformWorkInfo(
+            candidate.copy(
+                title = title.clean(),
+                author = author?.clean(),
+                synopsis = synopsis?.let(::cleanSynopsis),
+                coverUrl = image,
+            ),
+        )
     }
 
     private fun Element.toCandidate(baseUrl: String): SearchCandidate? {
@@ -133,6 +140,7 @@ private object PlatformHttp {
 
 private fun encoded(query: String): String = URLEncoder.encode(query, Charsets.UTF_8.name())
 private fun String.clean(): String = replace(Regex("\\s+"), " ").trim()
+private fun cleanSynopsis(value: String): String = Jsoup.parse(value).text().clean()
 private fun Document.firstText(vararg selectors: String): String? = selectors.firstNotNullOfOrNull { selectFirst(it)?.text()?.clean()?.ifBlank { null } }
 private fun Document.firstContent(vararg selectors: String): String? = selectors.firstNotNullOfOrNull { selectFirst(it)?.attr("content")?.clean()?.ifBlank { null } }
 
@@ -155,12 +163,17 @@ private fun Document.structuredWorkData(): StructuredWorkData? =
 
 private fun findBookObject(value: Any?): JSONObject? = when (value) {
     is JSONObject -> {
-        val type = value.optString("@type")
-        if (type.equals("Book", true) || type.equals("CreativeWork", true)) value
+        if (isWorkType(value.opt("@type"))) value
         else value.keys().asSequence().mapNotNull { findBookObject(value.opt(it)) }.firstOrNull()
     }
     is JSONArray -> (0 until value.length()).asSequence().mapNotNull { findBookObject(value.opt(it)) }.firstOrNull()
     else -> null
+}
+
+private fun isWorkType(value: Any?): Boolean = when (value) {
+    is JSONArray -> (0 until value.length()).any { isWorkType(value.opt(it)) }
+    is String -> value.equals("Book", true) || value.equals("CreativeWork", true) || value.equals("Novel", true)
+    else -> false
 }
 
 private fun jsonName(value: Any?): String? = when (value) {

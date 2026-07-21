@@ -3,35 +3,51 @@ package com.personal.novellibrary.domain
 import com.personal.novellibrary.data.Genre
 import com.personal.novellibrary.data.NovelEntity
 import kotlin.math.max
+import java.text.Normalizer
 
 object TitleNormalizer {
     private val noisePatterns = listOf(
-        Regex("\\.(txt)$", RegexOption.IGNORE_CASE),
+        Regex("\\.(txt|text)$", RegexOption.IGNORE_CASE),
         Regex("\\[\\s*완결\\s*]", RegexOption.IGNORE_CASE),
         Regex("\\(\\s*完\\s*\\)"),
         Regex("외전\\s*포함", RegexOption.IGNORE_CASE),
-        Regex("\\d+\\s*[-~]\\s*\\d+\\s*화"),
-        Regex("\\d+\\s*권"),
-        Regex("(?:완결|완)$"),
-        Regex("(?:텍본|스캔본|다운로드|完)$", RegexOption.IGNORE_CASE),
+        Regex("\\s*(?:전\\s*)?\\d+\\s*화?\\s*[-~～_]\\s*\\d+\\s*화?(?:\\s*(?:완결|완))?\\s*$"),
+        Regex("\\s*[-~～]\\s*\\d+\\s*화?(?:\\s*(?:완결|완))?\\s*$"),
+        Regex("\\s*\\d+\\s*화\\s*(?:완결|완)?\\s*$"),
+        Regex("\\s*\\d+\\s*권\\s*$"),
+        Regex("\\s*(?:완결|완|텍본|스캔본|다운로드|完)\\s*$", RegexOption.IGNORE_CASE),
     )
 
     fun initialTitle(fileName: String): String = fileName.substringBeforeLast('.').trim()
 
     fun normalize(fileName: String): String {
-        var title = fileName.trim()
+        var title = Normalizer.normalize(fileName.trim(), Normalizer.Form.NFKC)
         noisePatterns.forEach { title = title.replace(it, "") }
+        title = title.replace(Regex("^\\s*\\[[^]]+]\\s*"), "")
         return title
-            .replace(Regex("[._]+"), " ")
+            .replace(Regex("[._·]+"), " ")
             .replace(Regex("[\\[\\]{}()]"), " ")
             .replace(Regex("\\s+"), " ")
             .trim(' ', '-', '_', '·')
     }
 
+    /** Stable comparison key: spacing and punctuation in downloaded filenames are unreliable. */
+    fun matchingKey(rawTitle: String): String = normalize(rawTitle)
+        .lowercase()
+        .filter { it.isLetterOrDigit() }
+
+    /** Korean platform search works best with the same spacing-insensitive key used for matching. */
+    fun platformQuery(rawTitle: String): String {
+        val cleaned = normalize(rawTitle)
+        val hasHangul = cleaned.any { it in '\uAC00'..'\uD7A3' }
+        val hasLatin = cleaned.any { it in 'a'..'z' || it in 'A'..'Z' }
+        return if (hasHangul && !hasLatin) matchingKey(cleaned) else cleaned
+    }
+
     fun searchKey(novel: NovelEntity, customSearch: String? = null): String =
-        novel.confirmedTitle?.takeIf { it.isNotBlank() }
-            ?: customSearch?.takeIf { it.isNotBlank() }
-            ?: novel.normalizedTitle.ifBlank { novel.displayTitle }
+        customSearch?.takeIf { it.isNotBlank() }
+            ?: novel.confirmedTitle?.takeIf { it.isNotBlank() }
+            ?: platformQuery(novel.normalizedTitle.ifBlank { novel.displayTitle })
 }
 
 object GenreNormalizer {
@@ -64,11 +80,12 @@ data class Candidate(
 object MatchScorer {
     fun score(query: String, candidate: Candidate, author: String? = null, genre: Genre = Genre.UNCLASSIFIED): Int {
         if (candidate.excluded) return 0
-        val q = TitleNormalizer.normalize(query)
-        val t = TitleNormalizer.normalize(candidate.title)
+        val q = TitleNormalizer.matchingKey(query)
+        val t = TitleNormalizer.matchingKey(candidate.title)
         var score = 0
-        if (q == t) score += 70
-        if (candidate.author != null && author != null && candidate.author == author) score += 20
+        if (q == t && q.isNotBlank()) score += 85
+        else if (q.length >= 4 && t.length >= 4 && (q in t || t in q)) score += 60
+        if (candidate.author != null && author != null && TitleNormalizer.matchingKey(candidate.author) == TitleNormalizer.matchingKey(author)) score += 15
         if (genre != Genre.UNCLASSIFIED && GenreNormalizer.normalize(candidate.genre) == genre) score += 10
         score += max(0, 10 - kotlin.math.abs(q.length - t.length))
         return score.coerceIn(0, 100)

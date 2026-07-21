@@ -24,6 +24,33 @@ class LibraryLogicTest {
     }
 
     @Test
+    fun filenameVariantsProduceTheSameNovelMatchingKey() {
+        val expected = TitleNormalizer.matchingKey("내가 너에게 갈게")
+        val variants = listOf(
+            "내 가너에게갈 게.txt",
+            "내가너에게갈게1~80화.txt",
+            "내_가_너에게_갈_게 1-80.txt",
+            "[작가이름] 내가너에게 갈게 ~80화.txt",
+        )
+
+        variants.forEach { fileName ->
+            assertEquals(fileName, expected, TitleNormalizer.matchingKey(fileName))
+            assertEquals(fileName, expected, TitleNormalizer.platformQuery(fileName))
+        }
+    }
+
+    @Test
+    fun matchScoringIgnoresSpacingPunctuationAndEpisodeSuffixes() {
+        val score = MatchScorer.score(
+            "[작가이름] 내_가_너에게_갈_게 1-80.txt",
+            Candidate("내가 너에게 갈게"),
+        )
+
+        assertTrue(score >= 85)
+        assertFalse(MatchScorer.needsUserConfirmation(score))
+    }
+
+    @Test
     fun genreNormalizationSupportsRofanAndBl() {
         assertEquals(Genre.ROMANCE_FANTASY, GenreNormalizer.normalize("로판"))
         assertEquals(Genre.BL, GenreNormalizer.normalize("보이즈러브"))
