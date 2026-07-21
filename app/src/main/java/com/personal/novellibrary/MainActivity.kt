@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -380,6 +381,9 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
     val backupImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { vm.restoreBackup(it, RestoreMode.MERGE) }
     }
+    LaunchedEffect(expandedNovelId, syncJobs) {
+        expandedNovelId?.let(vm::loadPlatformListings)
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -389,7 +393,7 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
             Card(Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = RoundedCornerShape(24.dp)) {
                 Column(Modifier.padding(20.dp)) {
                     Text("내 서재", style = MaterialTheme.typography.headlineMedium)
-                    Text("$count개의 이야기가 기다리고 있어요", style = MaterialTheme.typography.bodyLarge)
+                    Text("${count}개의 이야기가 기다리고 있어요", style = MaterialTheme.typography.bodyLarge)
                     Text("TXT는 기기에 안전하게 두고 작품 정보만 정리해요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -580,7 +584,10 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                                             Text("${listing.platformType} · ${listing.lookupStatus} · 점수 ${listing.matchConfidence}")
                                             listing.platformTitle?.let { Text(it) }
                                             listing.platformAuthor?.let { Text("작가: $it") }
-                                            listing.synopsis?.let { Text(it, maxLines = 4) }
+                                            listing.synopsis?.let {
+                                                Text("줄거리", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                                                Text(it, maxLines = 6)
+                                            }
                                             if (listing.errorMessage != null) Text("오류: ${listing.errorMessage}")
                                             if (listing.detailUrl != null) {
                                                 TextButton({ vm.openPlatformUrl(listing.detailUrl) }) { Text("플랫폼 페이지 열기") }
