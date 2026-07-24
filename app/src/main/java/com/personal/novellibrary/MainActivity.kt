@@ -19,7 +19,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LinearProgressIndicator
@@ -29,6 +33,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,6 +52,7 @@ import androidx.work.WorkManager
 import com.personal.novellibrary.data.MIGRATION_1_2
 import com.personal.novellibrary.data.MIGRATION_2_3
 import com.personal.novellibrary.data.MIGRATION_3_4
+import com.personal.novellibrary.data.MIGRATION_4_5
 import com.personal.novellibrary.backup.LibraryBackupManager
 import com.personal.novellibrary.backup.RestoreMode
 import com.personal.novellibrary.data.Genre
@@ -83,7 +89,7 @@ class LibraryApp : Application()
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     private val db = Room.databaseBuilder(app, NovelDatabase::class.java, NovelDatabase.NAME)
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
         .build()
     private val repository = LibraryRepository(db.novelDao())
     private val settingsStore = LibrarySettingsStore(app)
@@ -158,7 +164,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshDiagnostics() = viewModelScope.launch {
         val service = DiagnosticsService(getApplication(), db.novelDao())
-        _diagnostics.value = service.format(service.snapshot(dbVersion = 4))
+        _diagnostics.value = service.format(service.snapshot(dbVersion = 5))
     }
 
     fun loadUserTags(novelId: Long) = viewModelScope.launch {
@@ -220,7 +226,11 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun addSelectedToCollection(ids: Set<Long>, collectionName: String) = viewModelScope.launch {
-        if (ids.isNotEmpty()) repository.addToCollection(ids.toList(), collectionName)
+        if (ids.isEmpty()) return@launch
+        _operationMessage.value = runCatching {
+            repository.addToCollection(ids.toList(), collectionName)
+            "선택한 작품 ${ids.size}개를 ‘${collectionName.trim()}’ 컬렉션에 추가했습니다."
+        }.getOrElse { "컬렉션 추가 실패: ${it.message ?: "컬렉션명을 확인하세요."}" }
     }
 
     fun createFavoriteUnreadSmartCollection(name: String = "즐겨찾기 + 읽기 전") = viewModelScope.launch {
@@ -283,6 +293,10 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startPlatformSearch(ids: Set<Long>, forceRefresh: Boolean = false) {
+        if (settings.value.enabledPlatforms.isEmpty()) {
+            _operationMessage.value = "설정에서 검색할 플랫폼을 하나 이상 켜 주세요."
+            return
+        }
         val targets = novels.value.filter { it.id in ids }
         targets.forEach { novel ->
             PlatformSearchWorker.enqueue(
@@ -310,16 +324,22 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startPlatformSearch(novelId: Long, customQuery: String, forceRefresh: Boolean = false) {
+        if (settings.value.enabledPlatforms.isEmpty()) {
+            _operationMessage.value = "설정에서 검색할 플랫폼을 하나 이상 켜 주세요."
+            return
+        }
         val novel = novels.value.firstOrNull { it.id == novelId } ?: return
-        val searchQuery = TitleNormalizer.platformQuery(customQuery.trim().ifBlank {
-            novel.confirmedTitle ?: novel.normalizedTitle.ifBlank { novel.displayTitle }
-        })
+        val defaultSource = novel.confirmedTitle ?: novel.normalizedTitle.ifBlank { novel.displayTitle }
+        val defaultQuery = TitleNormalizer.platformQuery(defaultSource)
+        val requestedQuery = customQuery.trim()
+        val searchQuery = TitleNormalizer.platformQuery(requestedQuery.ifBlank { defaultSource })
         PlatformSearchWorker.enqueue(
             context = getApplication(), novelId = novelId, query = searchQuery,
             enabledPlatforms = settings.value.enabledPlatforms,
             // A user-triggered single-work lookup must start on any connected network.
             // The Wi-Fi-only preference applies only to bulk searches.
-            wifiOnly = false, forceRefresh = forceRefresh,
+            wifiOnly = false,
+            forceRefresh = forceRefresh || (requestedQuery.isNotBlank() && searchQuery != defaultQuery),
         )
         _operationMessage.value = "‘$searchQuery’ 플랫폼 검색을 예약했습니다."
     }
@@ -351,6 +371,11 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun restore(id: Long) = viewModelScope.launch {
         repository.restore(listOf(id))
+    }
+
+    override fun onCleared() {
+        db.close()
+        super.onCleared()
     }
 }
 
@@ -402,32 +427,39 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
     val backupImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { vm.restoreBackup(it, RestoreMode.MERGE) }
     }
-    LaunchedEffect(expandedNovelId, syncJobs) {
+    val expandedJobStates = syncJobs
+        .filter { it.novelId == expandedNovelId }
+        .map { it.id to it.status }
+    LaunchedEffect(expandedNovelId, expandedJobStates) {
         expandedNovelId?.let(vm::loadPlatformListings)
     }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { TopAppBar(title = { Column { Text("Novel Library"); Text("나만의 이야기 서재", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } }) },
+        topBar = {
+            TopAppBar(
+                title = { Column { Text("Novel Library", style = MaterialTheme.typography.titleLarge); Text("나만의 이야기 서재", style = MaterialTheme.typography.labelMedium) } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            )
+        },
     ) { padding ->
         Column(Modifier.padding(padding).padding(16.dp)) {
-            Card(Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = RoundedCornerShape(24.dp)) {
+            ElevatedCard(Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = RoundedCornerShape(28.dp)) {
                 Column(Modifier.padding(20.dp)) {
-                    Text("내 서재", style = MaterialTheme.typography.headlineMedium)
-                    Text("${count}개의 이야기가 기다리고 있어요", style = MaterialTheme.typography.bodyLarge)
-                    Text("TXT는 기기에 안전하게 두고 작품 정보만 정리해요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (showTrash) "휴지통" else "내 서재", style = MaterialTheme.typography.headlineSmall)
+                    Text(if (showTrash) "삭제한 작품 ${trash.size}권" else "이야기 ${count}권", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AssistChip(onClick = {}, label = { Text("컬렉션 ${collections.size}") })
+                        val missingSynopsis = novels.count { it.synopsis.isNullOrBlank() }
+                        AssistChip(onClick = vm::findMissingSynopses, label = { Text("줄거리 대기 $missingSynopsis") })
+                        val pending = candidates.count { it.status.name == "NEEDS_USER_CONFIRMATION" }
+                        if (pending > 0) AssistChip(onClick = {}, label = { Text("확인 필요 $pending") })
+                    }
                 }
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { showTrash = false }) { Text("라이브러리") }
-                Button(onClick = { showTrash = true; selectedNovelIds = emptySet() }) { Text("휴지통 ${trash.size}") }
-            }
-            if (collections.isNotEmpty()) {
-                Text("컬렉션 ${collections.size}개: ${collections.take(3).joinToString { it.name }}")
-            }
-            val pendingCandidateCount = candidates.count { it.status.name == "NEEDS_USER_CONFIRMATION" }
-            if (pendingCandidateCount > 0) {
-                Text("확인 필요한 후보 ${pendingCandidateCount}개")
+                FilterChip(selected = !showTrash, onClick = { showTrash = false }, label = { Text("라이브러리") })
+                FilterChip(selected = showTrash, onClick = { showTrash = true; selectedNovelIds = emptySet() }, label = { Text("휴지통 ${trash.size}") })
             }
             if (syncJobs.isNotEmpty()) {
                 val running = syncJobs.count { it.status.name == "RUNNING" || it.status.name == "QUEUED" }
@@ -436,12 +468,14 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                 Text("플랫폼 작업: 진행 $running · 성공 $success · 실패 $failed")
             }
             recommendedNovelId?.let { id ->
-                Text("오늘의 추천 작품 ID: $id")
+                novels.firstOrNull { it.id == id }?.let { recommended ->
+                    Text("오늘의 추천: ${recommended.confirmedTitle ?: recommended.displayTitle}")
+                }
             }
             scanSummary?.let {
                 Text("마지막 스캔: 신규 ${it.inserted}, 변경 ${it.changed}, 동일 ${it.unchanged}, 발견 ${it.discovered}")
             }
-            operationMessage?.let { Text(it) }
+            operationMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary) }
             busyOperation?.let { operation ->
                 Text("$operation 진행 중${if (operation.startsWith("TXT")) " · 발견 $scanDiscovered 개" else ""}")
                 LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -455,9 +489,9 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                 LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { picker.launch(null) }) { Text("TXT 폴더 선택/스캔") }
-                Button(onClick = vm::findMissingSynopses) { Text("줄거리 없는 작품 찾기") }
-                Button(onClick = { recommendedNovelId = vm.recommendToday() }) { Text("오늘 뭐 읽지?") }
+                FilledTonalButton(onClick = { picker.launch(null) }) { Text("TXT 폴더 선택/스캔") }
+                FilledTonalButton(onClick = vm::findMissingSynopses) { Text("줄거리 자동 연결") }
+                FilledTonalButton(onClick = { recommendedNovelId = vm.recommendToday() }) { Text("오늘 뭐 읽지?") }
                 TextButton(onClick = { showTools = !showTools }) { Text(if (showTools) "도구 닫기" else "백업·설정") }
             }
             if (showTools) {
@@ -506,10 +540,10 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                 }
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Button(onClick = { genreFilter = null; favoriteOnly = false }) { Text("전체") }
-                Button(onClick = { genreFilter = Genre.ROMANCE_FANTASY }) { Text("로판") }
-                Button(onClick = { genreFilter = Genre.BL }) { Text("BL") }
-                Button(onClick = { favoriteOnly = !favoriteOnly }) { Text(if (favoriteOnly) "즐겨찾기 ON" else "즐겨찾기") }
+                FilterChip(selected = genreFilter == null && !favoriteOnly, onClick = { genreFilter = null; favoriteOnly = false }, label = { Text("전체") })
+                FilterChip(selected = genreFilter == Genre.ROMANCE_FANTASY, onClick = { genreFilter = Genre.ROMANCE_FANTASY }, label = { Text("로판") })
+                FilterChip(selected = genreFilter == Genre.BL, onClick = { genreFilter = Genre.BL }, label = { Text("BL") })
+                FilterChip(selected = favoriteOnly, onClick = { favoriteOnly = !favoriteOnly }, label = { Text("즐겨찾기") })
             }
             OutlinedTextField(
                 value = q,
@@ -540,13 +574,16 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Button(onClick = { vm.addSelectedToCollection(selectedNovelIds, collectionName) }) { Text("컬렉션에 추가") }
+                    Button(
+                        onClick = { vm.addSelectedToCollection(selectedNovelIds, collectionName) },
+                        enabled = collectionName.isNotBlank(),
+                    ) { Text("컬렉션에 추가") }
                 }
             }
             val visibleNovels = if (showTrash) trash else LibraryFilterEngine.apply(novels, LibraryFilter(genre = genreFilter, favoriteOnly = favoriteOnly))
-            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(visibleNovels, key = { it.id }) { novel ->
-                    Card(Modifier.fillMaxWidth().padding(vertical = 6.dp), shape = RoundedCornerShape(20.dp)) {
+                    ElevatedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
                         Column(Modifier.padding(16.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(novel.confirmedTitle ?: novel.displayTitle, style = MaterialTheme.typography.titleMedium)

@@ -24,7 +24,7 @@ data class ReadingRecordUpdate(
 )
 
 class LibraryRepository(private val dao: NovelDao) {
-    fun observeNovels(query: String = "") = dao.observeNovels(query)
+    fun observeNovels(query: String = "") = dao.observeNovels(escapeLikeQuery(query))
     fun observeCount() = dao.observeCount()
     fun observeTrash() = dao.observeTrash()
     fun observeCollections() = dao.observeCollections()
@@ -37,30 +37,35 @@ class LibraryRepository(private val dao: NovelDao) {
         if (mode == RestoreMode.COLLECTIONS_ONLY) return 0
         var restored = 0
         imported.forEach { backup ->
-            val existing = dao.novelByNormalizedTitle(backup.normalizedTitle)
+            val normalizedBackup = backup.copy(
+                normalizedTitle = TitleNormalizer.matchingKey(
+                    backup.confirmedTitle ?: backup.displayTitle.ifBlank { backup.normalizedTitle },
+                ).ifBlank { backup.normalizedTitle },
+            )
+            val existing = dao.novelByNormalizedTitle(normalizedBackup.normalizedTitle)
             if (existing == null) {
                 if (mode != RestoreMode.USER_DATA_ONLY) {
-                    dao.upsertNovel(backup.copy(id = 0, createdAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis()))
+                    dao.upsertNovel(normalizedBackup.copy(id = 0, createdAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis()))
                     restored++
                 }
             } else {
                 val merged = if (mode == RestoreMode.USER_DATA_ONLY) {
                     existing.copy(
-                        isFavorite = backup.isFavorite,
-                        readingStatus = backup.readingStatus,
-                        personalRating = backup.personalRating,
-                        memo = backup.memo,
-                        readingStartedAt = backup.readingStartedAt,
-                        completedAt = backup.completedAt,
-                        droppedAt = backup.droppedAt,
-                        lastReadChapter = backup.lastReadChapter,
-                        rereadCount = backup.rereadCount,
-                        readingNote = backup.readingNote,
-                        isInfoLocked = backup.isInfoLocked,
+                        isFavorite = normalizedBackup.isFavorite,
+                        readingStatus = normalizedBackup.readingStatus,
+                        personalRating = normalizedBackup.personalRating,
+                        memo = normalizedBackup.memo,
+                        readingStartedAt = normalizedBackup.readingStartedAt,
+                        completedAt = normalizedBackup.completedAt,
+                        droppedAt = normalizedBackup.droppedAt,
+                        lastReadChapter = normalizedBackup.lastReadChapter,
+                        rereadCount = normalizedBackup.rereadCount,
+                        readingNote = normalizedBackup.readingNote,
+                        isInfoLocked = normalizedBackup.isInfoLocked,
                         updatedAt = System.currentTimeMillis(),
                     )
                 } else {
-                    backup.copy(id = existing.id, createdAt = existing.createdAt, updatedAt = System.currentTimeMillis())
+                    normalizedBackup.copy(id = existing.id, createdAt = existing.createdAt, updatedAt = System.currentTimeMillis())
                 }
                 dao.upsertNovel(merged)
                 restored++
@@ -78,7 +83,7 @@ class LibraryRepository(private val dao: NovelDao) {
         dao.updateManualMetadata(
             novelId,
             cleanTitle,
-            TitleNormalizer.normalize(cleanTitle).ifBlank { cleanTitle },
+            TitleNormalizer.matchingKey(cleanTitle).ifBlank { cleanTitle },
             author?.trim()?.takeIf { it.isNotEmpty() },
             synopsis?.trim()?.takeIf { it.isNotEmpty() },
             genre,
@@ -89,8 +94,10 @@ class LibraryRepository(private val dao: NovelDao) {
     suspend fun userTags(novelId: Long): List<String> = dao.userTagNames(novelId)
 
     suspend fun addUserTag(novelId: Long, name: String) {
-        dao.addUserTag(novelId, name)
-        dao.insertHistory(ChangeHistoryEntity(novelId = novelId, actionType = "USER_TAG_ADD", afterValue = name.trim()))
+        val cleanName = name.trim()
+        if (cleanName.isEmpty()) return
+        dao.addUserTag(novelId, cleanName)
+        dao.insertHistory(ChangeHistoryEntity(novelId = novelId, actionType = "USER_TAG_ADD", afterValue = cleanName))
     }
 
     suspend fun removeUserTag(novelId: Long, name: String) {
@@ -148,11 +155,19 @@ class LibraryRepository(private val dao: NovelDao) {
     suspend fun createSmartCollection(name: String, filterJson: String) {
         val cleanName = name.trim()
         require(cleanName.isNotBlank()) { "smart collection name must not be blank" }
+        val now = System.currentTimeMillis()
+        val existing = dao.collectionByName(cleanName)
         dao.upsertCollection(
-            CollectionEntity(
+            existing?.copy(
+                collectionType = com.personal.novellibrary.data.CollectionType.SMART,
+                filterJson = filterJson,
+                updatedAt = now,
+            ) ?: CollectionEntity(
                 name = cleanName,
                 collectionType = com.personal.novellibrary.data.CollectionType.SMART,
                 filterJson = filterJson,
+                createdAt = now,
+                updatedAt = now,
             ),
         )
     }
@@ -160,7 +175,8 @@ class LibraryRepository(private val dao: NovelDao) {
     suspend fun addToCollection(ids: List<Long>, collectionName: String) {
         val cleanName = collectionName.trim()
         require(cleanName.isNotBlank()) { "collectionName must not be blank" }
-        val collectionId = dao.upsertCollection(CollectionEntity(name = cleanName))
+        val collectionId = dao.collectionByName(cleanName)?.id
+            ?: dao.upsertCollection(CollectionEntity(name = cleanName))
         ids.forEachIndexed { index, novelId ->
             dao.upsertCollectionItem(
                 CollectionItemEntity(
@@ -198,6 +214,7 @@ class LibraryRepository(private val dao: NovelDao) {
             candidate.candidateCoverUrl,
         )
         dao.updateCandidateStatus(candidate.id, LookupStatus.SUCCESS)
+        dao.clearPendingCandidates(candidate.novelId, candidate.platformType)
         dao.insertHistory(ChangeHistoryEntity(novelId = candidate.novelId, actionType = "CANDIDATE_ACCEPT", afterValue = candidate.candidateTitle))
     }
 
@@ -225,3 +242,8 @@ class LibraryRepository(private val dao: NovelDao) {
         ids.forEach { dao.insertHistory(ChangeHistoryEntity(novelId = it, actionType = "RESTORE", afterValue = "true")) }
     }
 }
+
+internal fun escapeLikeQuery(value: String): String = value
+    .replace("\\", "\\\\")
+    .replace("%", "\\%")
+    .replace("_", "\\_")

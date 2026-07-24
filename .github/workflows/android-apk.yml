@@ -44,6 +44,16 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Verify merge integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- .github app/src; then
+            echo "Unresolved merge marker detected." >&2
+            exit 1
+          fi
+          git diff --check "$(git hash-object -t tree /dev/null)" HEAD
+
       - name: Test, lint, and build debug APK
         run: |
           mkdir -p app/build/reports/ci-logs
@@ -119,7 +129,6 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Run emulator tests
-        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -127,12 +136,9 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            set +e
-            gradle --no-daemon :app:connectedDebugAndroidTest
-            status=$?
+            if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.personal.novellibrary.PlatformLiveSmokeTest && gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.personal.novellibrary.PlatformLiveSmokeTest; else gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.personal.novellibrary.PlatformLiveSmokeTest; fi
             mkdir -p app/build/reports/device-baseline
             adb logcat -d -s NovelLibraryPerf:I NovelLibraryPlatform:I '*:S' > app/build/reports/device-baseline/results.log
-            exit $status
       - name: Upload device test reports
         if: always()
         uses: actions/upload-artifact@v4

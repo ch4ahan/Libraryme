@@ -13,7 +13,9 @@ import java.util.zip.ZipInputStream
 
 class LibraryBackupManager(private val context: Context) {
     fun exportBackup(uri: Uri, novels: List<NovelEntity>, settingsJson: JSONObject = JSONObject()) {
-        context.contentResolver.openOutputStream(uri)?.use { out ->
+        val output = context.contentResolver.openOutputStream(uri)
+            ?: error("백업 파일을 만들 수 없습니다.")
+        output.use { out ->
             ZipOutputStream(out).use { zip ->
                 zip.putText("metadata.json", JSONObject(mapOf("format" to "Novel Library Backup", "version" to 1)).toString(2))
                 zip.putText("settings.json", settingsJson.toString(2))
@@ -24,8 +26,10 @@ class LibraryBackupManager(private val context: Context) {
     }
 
     fun exportCsv(uri: Uri, novels: List<NovelEntity>) {
-        context.contentResolver.openOutputStream(uri)?.use { out ->
-            OutputStreamWriter(out).use { writer ->
+        val output = context.contentResolver.openOutputStream(uri)
+            ?: error("CSV 파일을 만들 수 없습니다.")
+        output.use { out ->
+            OutputStreamWriter(out, Charsets.UTF_8).use { writer ->
                 writer.write(NovelCsvExport.toCsv(novels))
             }
         }
@@ -51,7 +55,7 @@ class LibraryBackupManager(private val context: Context) {
 
     private fun ZipOutputStream.putText(name: String, text: String) {
         putNextEntry(ZipEntry(name))
-        write(text.toByteArray())
+        write(text.toByteArray(Charsets.UTF_8))
         closeEntry()
     }
 

@@ -62,6 +62,10 @@ object GenreNormalizer {
             "미스터리" in value -> Genre.MYSTERY
             "스릴러" in value -> Genre.THRILLER
             "공포" in value -> Genre.HORROR
+            value == "sf" || "사이언스픽션" in value || "과학소설" in value -> Genre.SF
+            "게임" in value -> Genre.GAME
+            "대체역사" in value || "역사" in value -> Genre.HISTORY
+            "드라마" in value -> Genre.DRAMA
             "라이트노벨" in value -> Genre.LIGHT_NOVEL
             "로맨스" in value -> Genre.ROMANCE
             "판타지" in value -> Genre.FANTASY

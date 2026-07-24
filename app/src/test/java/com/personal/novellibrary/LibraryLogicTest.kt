@@ -12,12 +12,18 @@ import com.personal.novellibrary.domain.SmartCollectionRule
 import com.personal.novellibrary.domain.RecommendationEngine
 import com.personal.novellibrary.domain.RecommendationRule
 import com.personal.novellibrary.domain.TitleNormalizer
+import com.personal.novellibrary.repository.escapeLikeQuery
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LibraryLogicTest {
+    @Test
+    fun searchTreatsSqlWildcardsAsLiteralCharacters() {
+        assertEquals("""100\%\_완료\\본""", escapeLikeQuery("""100%_완료\본"""))
+    }
+
     @Test
     fun titleNormalizationRemovesNoise() {
         assertEquals("악녀는 두 번 산다", TitleNormalizer.normalize("[완결] 악녀는 두 번 산다 1-200화 외전포함.txt"))
@@ -55,6 +61,8 @@ class LibraryLogicTest {
         assertEquals(Genre.ROMANCE_FANTASY, GenreNormalizer.normalize("로판"))
         assertEquals(Genre.BL, GenreNormalizer.normalize("보이즈러브"))
         assertEquals(Genre.MODERN_FANTASY, GenreNormalizer.normalize("현판"))
+        assertEquals(Genre.SF, GenreNormalizer.normalize("SF"))
+        assertEquals(Genre.HISTORY, GenreNormalizer.normalize("대체역사"))
     }
 
     @Test
@@ -87,6 +95,13 @@ class LibraryLogicTest {
             rule = RecommendationRule(requireFileAvailable = true),
         )
         assertEquals(listOf(available), candidates)
+        assertTrue(
+            RecommendationEngine.candidates(
+                listOf(available),
+                fileAvailability = emptyMap(),
+                rule = RecommendationRule(requireFileAvailable = true),
+            ).isEmpty(),
+        )
     }
 
 

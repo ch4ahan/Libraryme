@@ -24,7 +24,7 @@ object RecommendationEngine {
             (!rule.unreadOnly || novel.readingStatus == ReadingStatus.UNREAD || novel.readingStatus == ReadingStatus.PLAN_TO_READ) &&
             (!rule.favoriteOnly || novel.isFavorite) &&
             (!rule.completedOnly || novel.isCompleted == true) &&
-            (!rule.requireFileAvailable || fileAvailability[novel.id] != false)
+            (!rule.requireFileAvailable || fileAvailability[novel.id] == true)
     }
 
     fun pick(
