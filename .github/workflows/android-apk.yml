@@ -136,16 +136,9 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            set +e
-            gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.personal.novellibrary.PlatformLiveSmokeTest
-            status=$?
-            if [ "$status" -eq 0 ] && [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
-              gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.personal.novellibrary.PlatformLiveSmokeTest
-              status=$?
-            fi
+            if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.personal.novellibrary.PlatformLiveSmokeTest && gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.personal.novellibrary.PlatformLiveSmokeTest; else gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.personal.novellibrary.PlatformLiveSmokeTest; fi
             mkdir -p app/build/reports/device-baseline
             adb logcat -d -s NovelLibraryPerf:I NovelLibraryPlatform:I '*:S' > app/build/reports/device-baseline/results.log
-            exit $status
       - name: Upload device test reports
         if: always()
         uses: actions/upload-artifact@v4
