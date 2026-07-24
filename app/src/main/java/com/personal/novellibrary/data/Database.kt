@@ -2,6 +2,7 @@ package com.personal.novellibrary.data
 
 import androidx.room.*
 import androidx.room.migration.Migration
+import com.personal.novellibrary.domain.TitleNormalizer
 import kotlinx.coroutines.flow.Flow
 
 data class FileScanRecord(
@@ -22,22 +23,22 @@ interface NovelDao {
         SELECT * FROM NovelEntity
         WHERE isDeleted = 0
           AND (:query = ''
-               OR normalizedTitle LIKE '%' || :query || '%'
-               OR displayTitle LIKE '%' || :query || '%'
-               OR author LIKE '%' || :query || '%'
-               OR synopsis LIKE '%' || :query || '%'
-               OR memo LIKE '%' || :query || '%'
-               OR EXISTS (SELECT 1 FROM AliasEntity a WHERE a.novelId = NovelEntity.id AND a.alias LIKE '%' || :query || '%')
-               OR EXISTS (SELECT 1 FROM LocalFileEntity f WHERE f.novelId = NovelEntity.id AND f.originalFileName LIKE '%' || :query || '%')
+               OR normalizedTitle LIKE '%' || :query || '%' ESCAPE '\'
+               OR displayTitle LIKE '%' || :query || '%' ESCAPE '\'
+               OR author LIKE '%' || :query || '%' ESCAPE '\'
+               OR synopsis LIKE '%' || :query || '%' ESCAPE '\'
+               OR memo LIKE '%' || :query || '%' ESCAPE '\'
+               OR EXISTS (SELECT 1 FROM AliasEntity a WHERE a.novelId = NovelEntity.id AND a.alias LIKE '%' || :query || '%' ESCAPE '\')
+               OR EXISTS (SELECT 1 FROM LocalFileEntity f WHERE f.novelId = NovelEntity.id AND f.originalFileName LIKE '%' || :query || '%' ESCAPE '\')
                OR EXISTS (
                    SELECT 1 FROM NovelUserTagCrossRef x
                    JOIN UserTagEntity t ON t.id = x.tagId
-                   WHERE x.novelId = NovelEntity.id AND t.name LIKE '%' || :query || '%'
+                   WHERE x.novelId = NovelEntity.id AND t.name LIKE '%' || :query || '%' ESCAPE '\'
                )
                OR EXISTS (
                    SELECT 1 FROM CollectionItemEntity ci
                    JOIN CollectionEntity c ON c.id = ci.collectionId
-                   WHERE ci.novelId = NovelEntity.id AND c.name LIKE '%' || :query || '%'
+                   WHERE ci.novelId = NovelEntity.id AND c.name LIKE '%' || :query || '%' ESCAPE '\'
                ))
         ORDER BY updatedAt DESC
         """
@@ -242,6 +243,12 @@ interface NovelDao {
     @Query("DELETE FROM SearchCandidateEntity WHERE novelId = :novelId AND platformType = :platformType AND status = 'NEEDS_USER_CONFIRMATION'")
     suspend fun clearPendingCandidates(novelId: Long, platformType: PlatformType)
 
+    @Query("SELECT COUNT(*) FROM SearchCandidateEntity WHERE novelId = :novelId AND platformType = :platformType AND status = 'NEEDS_USER_CONFIRMATION'")
+    suspend fun pendingCandidateCount(novelId: Long, platformType: PlatformType): Int
+
+    @Query("SELECT * FROM CollectionEntity WHERE name = :name LIMIT 1")
+    suspend fun collectionByName(name: String): CollectionEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertCollection(collection: CollectionEntity): Long
 
@@ -299,7 +306,7 @@ interface NovelDao {
         ChangeHistoryEntity::class,
         TrashEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class NovelDatabase : RoomDatabase() {
@@ -337,5 +344,71 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
             "CREATE UNIQUE INDEX IF NOT EXISTS index_PlatformListingEntity_novelId_platformType " +
                 "ON PlatformListingEntity(novelId, platformType)",
         )
+    }
+}
+
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        val normalizedTitles = buildList {
+            db.query("SELECT id, normalizedTitle, displayTitle, confirmedTitle FROM NovelEntity").use { cursor ->
+                val idIndex = cursor.getColumnIndexOrThrow("id")
+                val normalizedIndex = cursor.getColumnIndexOrThrow("normalizedTitle")
+                val displayIndex = cursor.getColumnIndexOrThrow("displayTitle")
+                val confirmedIndex = cursor.getColumnIndexOrThrow("confirmedTitle")
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idIndex)
+                    val original = cursor.getString(normalizedIndex).orEmpty()
+                    val display = cursor.getString(displayIndex).orEmpty()
+                    val confirmed = if (cursor.isNull(confirmedIndex)) null else cursor.getString(confirmedIndex)
+                    val matchingKey = TitleNormalizer.matchingKey(
+                        confirmed?.takeIf { it.isNotBlank() }
+                            ?: display.takeIf { it.isNotBlank() }
+                            ?: original,
+                    ).ifBlank { original }
+                    add(id to matchingKey)
+                }
+            }
+        }
+        db.compileStatement("UPDATE NovelEntity SET normalizedTitle = ? WHERE id = ?").use { statement ->
+            normalizedTitles.forEach { (id, matchingKey) ->
+                statement.clearBindings()
+                statement.bindString(1, matchingKey)
+                statement.bindLong(2, id)
+                statement.executeUpdateDelete()
+            }
+        }
+
+        db.execSQL(
+            """
+            CREATE TEMP TABLE collection_survivors AS
+            SELECT name, MAX(id) AS keepId
+            FROM CollectionEntity
+            GROUP BY name
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            INSERT OR IGNORE INTO CollectionItemEntity(collectionId, novelId, addedAt, sortOrder)
+            SELECT survivors.keepId, items.novelId, items.addedAt, items.sortOrder
+            FROM CollectionItemEntity AS items
+            JOIN CollectionEntity AS collections ON collections.id = items.collectionId
+            JOIN collection_survivors AS survivors ON survivors.name = collections.name
+            WHERE items.collectionId != survivors.keepId
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            DELETE FROM CollectionItemEntity
+            WHERE collectionId IN (
+                SELECT collections.id
+                FROM CollectionEntity AS collections
+                JOIN collection_survivors AS survivors ON survivors.name = collections.name
+                WHERE collections.id != survivors.keepId
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("DELETE FROM CollectionEntity WHERE id NOT IN (SELECT keepId FROM collection_survivors)")
+        db.execSQL("DROP TABLE collection_survivors")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_CollectionEntity_name ON CollectionEntity(name)")
     }
 }

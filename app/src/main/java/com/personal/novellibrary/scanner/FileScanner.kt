@@ -23,6 +23,9 @@ class TxtFileScanner(private val context: Context, private val dao: NovelDao) {
     ): ScanSummary {
         val root = DocumentFile.fromTreeUri(context, treeUri)
             ?: return ScanSummary(discovered = 0, inserted = 0, changed = 0, unchanged = 0, missingMarked = false)
+        require(root.exists() && root.isDirectory && root.canRead()) {
+            "선택한 폴더를 읽을 수 없습니다. 폴더 접근 권한을 다시 허용하세요."
+        }
 
         val records = mutableListOf<FileScanRecord>()
 

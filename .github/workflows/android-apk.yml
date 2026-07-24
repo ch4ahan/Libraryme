@@ -52,7 +52,7 @@ jobs:
             echo "Unresolved merge marker detected." >&2
             exit 1
           fi
-          git diff --check
+          git diff --check "$(git hash-object -t tree /dev/null)" HEAD
 
       - name: Test, lint, and build debug APK
         run: |
@@ -129,7 +129,6 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Run emulator tests
-        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -138,8 +137,14 @@ jobs:
           disable-animations: true
           script: |
             set +e
-            gradle --no-daemon :app:connectedDebugAndroidTest
+            gradle --no-daemon :app:connectedDebugAndroidTest \
+              -Pandroid.testInstrumentationRunnerArguments.notClass=com.personal.novellibrary.PlatformLiveSmokeTest
             status=$?
+            if [ "$status" -eq 0 ] && [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+              gradle --no-daemon :app:connectedDebugAndroidTest \
+                -Pandroid.testInstrumentationRunnerArguments.class=com.personal.novellibrary.PlatformLiveSmokeTest
+              status=$?
+            fi
             mkdir -p app/build/reports/device-baseline
             adb logcat -d -s NovelLibraryPerf:I NovelLibraryPlatform:I '*:S' > app/build/reports/device-baseline/results.log
             exit $status

@@ -2,6 +2,7 @@ package com.personal.novellibrary
 
 import androidx.work.NetworkType
 import com.personal.novellibrary.worker.networkTypeForSearch
+import com.personal.novellibrary.worker.platformSearchWorkName
 import com.personal.novellibrary.worker.shouldRetryPlatformSearch
 import com.personal.novellibrary.worker.rankForDetailLookup
 import com.personal.novellibrary.data.PlatformType
@@ -26,6 +27,11 @@ class SearchWorkerPolicyTest {
         assertEquals(true, shouldRetryPlatformSearch(failures = 5, platformCount = 5, runAttemptCount = 1))
         assertEquals(false, shouldRetryPlatformSearch(failures = 5, platformCount = 5, runAttemptCount = 2))
         assertEquals(false, shouldRetryPlatformSearch(failures = 4, platformCount = 5, runAttemptCount = 0))
+    }
+
+    @Test
+    fun everyQueryForTheSameNovelUsesOneReplacementQueue() {
+        assertEquals("platform-search-42", platformSearchWorkName(42))
     }
 
     @Test

@@ -88,4 +88,48 @@ class PlatformAdapterTest {
 
         assertEquals(listOf("정보 있는 작품", "정보 없는 작품"), candidates.map { it.title })
     }
+
+    @Test
+    fun searchParserRejectsLookalikeLinksOnUntrustedHosts() {
+        val html = """
+            <a href="https://evil.example/redirect?next=https://series.naver.com/novel/detail.series?productNo=1">
+              가짜 외부 링크
+            </a>
+            <a href="https://series.naver.com/novel/detail.series?productNo=2">정상 링크</a>
+        """.trimIndent()
+
+        val candidates = NaverSeriesAdapter().parseSearchDocument(
+            Jsoup.parse(html, "https://series.naver.com/search/search.series"),
+        )
+
+        assertEquals(listOf("정상 링크"), candidates.map { it.title })
+    }
+
+    @Test
+    fun detailParserPrefersNestedBookOverGenericCreativeWork() {
+        val html = """
+            <script type="application/ld+json">
+              {"@type":"CreativeWork","name":"사이트 공통 정보","@graph":[
+                {"@type":"Book","name":"실제 작품","author":{"name":"실제 작가"},
+                 "description":"실제 줄거리"}
+              ]}
+            </script>
+        """.trimIndent()
+        val original = SearchCandidate(
+            PlatformType.NAVER_SERIES,
+            "임시",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+        )
+
+        val result = NaverSeriesAdapter().parseDetailDocument(Jsoup.parse(html), original).candidate
+
+        assertEquals("실제 작품", result.title)
+        assertEquals("실제 작가", result.author)
+        assertEquals("실제 줄거리", result.synopsis)
+    }
 }

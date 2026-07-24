@@ -52,6 +52,7 @@ import androidx.work.WorkManager
 import com.personal.novellibrary.data.MIGRATION_1_2
 import com.personal.novellibrary.data.MIGRATION_2_3
 import com.personal.novellibrary.data.MIGRATION_3_4
+import com.personal.novellibrary.data.MIGRATION_4_5
 import com.personal.novellibrary.backup.LibraryBackupManager
 import com.personal.novellibrary.backup.RestoreMode
 import com.personal.novellibrary.data.Genre
@@ -88,7 +89,7 @@ class LibraryApp : Application()
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     private val db = Room.databaseBuilder(app, NovelDatabase::class.java, NovelDatabase.NAME)
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
         .build()
     private val repository = LibraryRepository(db.novelDao())
     private val settingsStore = LibrarySettingsStore(app)
@@ -163,7 +164,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshDiagnostics() = viewModelScope.launch {
         val service = DiagnosticsService(getApplication(), db.novelDao())
-        _diagnostics.value = service.format(service.snapshot(dbVersion = 4))
+        _diagnostics.value = service.format(service.snapshot(dbVersion = 5))
     }
 
     fun loadUserTags(novelId: Long) = viewModelScope.launch {
@@ -225,7 +226,11 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun addSelectedToCollection(ids: Set<Long>, collectionName: String) = viewModelScope.launch {
-        if (ids.isNotEmpty()) repository.addToCollection(ids.toList(), collectionName)
+        if (ids.isEmpty()) return@launch
+        _operationMessage.value = runCatching {
+            repository.addToCollection(ids.toList(), collectionName)
+            "선택한 작품 ${ids.size}개를 ‘${collectionName.trim()}’ 컬렉션에 추가했습니다."
+        }.getOrElse { "컬렉션 추가 실패: ${it.message ?: "컬렉션명을 확인하세요."}" }
     }
 
     fun createFavoriteUnreadSmartCollection(name: String = "즐겨찾기 + 읽기 전") = viewModelScope.launch {
@@ -288,6 +293,10 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startPlatformSearch(ids: Set<Long>, forceRefresh: Boolean = false) {
+        if (settings.value.enabledPlatforms.isEmpty()) {
+            _operationMessage.value = "설정에서 검색할 플랫폼을 하나 이상 켜 주세요."
+            return
+        }
         val targets = novels.value.filter { it.id in ids }
         targets.forEach { novel ->
             PlatformSearchWorker.enqueue(
@@ -315,16 +324,22 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startPlatformSearch(novelId: Long, customQuery: String, forceRefresh: Boolean = false) {
+        if (settings.value.enabledPlatforms.isEmpty()) {
+            _operationMessage.value = "설정에서 검색할 플랫폼을 하나 이상 켜 주세요."
+            return
+        }
         val novel = novels.value.firstOrNull { it.id == novelId } ?: return
-        val searchQuery = TitleNormalizer.platformQuery(customQuery.trim().ifBlank {
-            novel.confirmedTitle ?: novel.normalizedTitle.ifBlank { novel.displayTitle }
-        })
+        val defaultSource = novel.confirmedTitle ?: novel.normalizedTitle.ifBlank { novel.displayTitle }
+        val defaultQuery = TitleNormalizer.platformQuery(defaultSource)
+        val requestedQuery = customQuery.trim()
+        val searchQuery = TitleNormalizer.platformQuery(requestedQuery.ifBlank { defaultSource })
         PlatformSearchWorker.enqueue(
             context = getApplication(), novelId = novelId, query = searchQuery,
             enabledPlatforms = settings.value.enabledPlatforms,
             // A user-triggered single-work lookup must start on any connected network.
             // The Wi-Fi-only preference applies only to bulk searches.
-            wifiOnly = false, forceRefresh = forceRefresh,
+            wifiOnly = false,
+            forceRefresh = forceRefresh || (requestedQuery.isNotBlank() && searchQuery != defaultQuery),
         )
         _operationMessage.value = "‘$searchQuery’ 플랫폼 검색을 예약했습니다."
     }
@@ -356,6 +371,11 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun restore(id: Long) = viewModelScope.launch {
         repository.restore(listOf(id))
+    }
+
+    override fun onCleared() {
+        db.close()
+        super.onCleared()
     }
 }
 
@@ -407,7 +427,10 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
     val backupImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { vm.restoreBackup(it, RestoreMode.MERGE) }
     }
-    LaunchedEffect(expandedNovelId, syncJobs) {
+    val expandedJobStates = syncJobs
+        .filter { it.novelId == expandedNovelId }
+        .map { it.id to it.status }
+    LaunchedEffect(expandedNovelId, expandedJobStates) {
         expandedNovelId?.let(vm::loadPlatformListings)
     }
 
@@ -438,8 +461,16 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                 FilterChip(selected = !showTrash, onClick = { showTrash = false }, label = { Text("라이브러리") })
                 FilterChip(selected = showTrash, onClick = { showTrash = true; selectedNovelIds = emptySet() }, label = { Text("휴지통 ${trash.size}") })
             }
+            if (syncJobs.isNotEmpty()) {
+                val running = syncJobs.count { it.status.name == "RUNNING" || it.status.name == "QUEUED" }
+                val success = syncJobs.count { it.status.name == "SUCCESS" }
+                val failed = syncJobs.count { it.status.name == "FAILED" }
+                Text("플랫폼 작업: 진행 $running · 성공 $success · 실패 $failed")
+            }
             recommendedNovelId?.let { id ->
-                Text("오늘의 추천 작품 ID: $id")
+                novels.firstOrNull { it.id == id }?.let { recommended ->
+                    Text("오늘의 추천: ${recommended.confirmedTitle ?: recommended.displayTitle}")
+                }
             }
             scanSummary?.let {
                 Text("마지막 스캔: 신규 ${it.inserted}, 변경 ${it.changed}, 동일 ${it.unchanged}, 발견 ${it.discovered}")
@@ -458,7 +489,7 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                 LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = { picker.launch(null) }) { Text("TXT 스캔") }
+                FilledTonalButton(onClick = { picker.launch(null) }) { Text("TXT 폴더 선택/스캔") }
                 FilledTonalButton(onClick = vm::findMissingSynopses) { Text("줄거리 자동 연결") }
                 FilledTonalButton(onClick = { recommendedNovelId = vm.recommendToday() }) { Text("오늘 뭐 읽지?") }
                 TextButton(onClick = { showTools = !showTools }) { Text(if (showTools) "도구 닫기" else "백업·설정") }
@@ -543,7 +574,10 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Button(onClick = { vm.addSelectedToCollection(selectedNovelIds, collectionName) }) { Text("컬렉션에 추가") }
+                    Button(
+                        onClick = { vm.addSelectedToCollection(selectedNovelIds, collectionName) },
+                        enabled = collectionName.isNotBlank(),
+                    ) { Text("컬렉션에 추가") }
                 }
             }
             val visibleNovels = if (showTrash) trash else LibraryFilterEngine.apply(novels, LibraryFilter(genre = genreFilter, favoriteOnly = favoriteOnly))
