@@ -41,8 +41,12 @@ class LibraryLogicTest {
 
         variants.forEach { fileName ->
             assertEquals(fileName, expected, TitleNormalizer.matchingKey(fileName))
-            assertEquals(fileName, expected, TitleNormalizer.platformQuery(fileName))
         }
+    }
+
+    @Test
+    fun platformQueryKeepsNaturalKoreanWordSpacing() {
+        assertEquals("내가 너에게 갈게", TitleNormalizer.platformQuery("내가 너에게 갈게 1-80화.txt"))
     }
 
     @Test

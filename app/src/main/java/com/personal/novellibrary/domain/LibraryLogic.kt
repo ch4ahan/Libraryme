@@ -36,13 +36,8 @@ object TitleNormalizer {
         .lowercase()
         .filter { it.isLetterOrDigit() }
 
-    /** Korean platform search works best with the same spacing-insensitive key used for matching. */
-    fun platformQuery(rawTitle: String): String {
-        val cleaned = normalize(rawTitle)
-        val hasHangul = cleaned.any { it in '\uAC00'..'\uD7A3' }
-        val hasLatin = cleaned.any { it in 'a'..'z' || it in 'A'..'Z' }
-        return if (hasHangul && !hasLatin) matchingKey(cleaned) else cleaned
-    }
+    /** Keep natural spacing: Korean platform search engines tokenize words and often return no result for a collapsed title. */
+    fun platformQuery(rawTitle: String): String = normalize(rawTitle).take(100)
 
     fun searchKey(novel: NovelEntity, customSearch: String? = null): String =
         customSearch?.takeIf { it.isNotBlank() }
