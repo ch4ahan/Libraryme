@@ -32,8 +32,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -60,10 +58,8 @@ import com.personal.novellibrary.data.NovelDatabase
 import com.personal.novellibrary.data.PlatformType
 import com.personal.novellibrary.data.PlatformListingEntity
 import com.personal.novellibrary.data.ReadingStatus
-import com.personal.novellibrary.domain.RecommendationEngine
 import com.personal.novellibrary.domain.LibraryFilter
 import com.personal.novellibrary.domain.LibraryFilterEngine
-import com.personal.novellibrary.domain.RecommendationRule
 import com.personal.novellibrary.domain.TitleNormalizer
 import com.personal.novellibrary.diagnostics.DiagnosticsService
 import com.personal.novellibrary.diagnostics.PrdCoverage
@@ -243,11 +239,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    fun recommendToday(): Long? = RecommendationEngine.pick(
-        novels = novels.value,
-        fileAvailability = emptyMap(),
-        rule = RecommendationRule(unreadOnly = true, requireFileAvailable = false),
-    )?.id
+
 
     fun exportBackup(uri: Uri) = viewModelScope.launch {
         _busyOperation.value = "백업 ZIP 생성"
@@ -408,7 +400,6 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
     var selectedNovelIds by remember { mutableStateOf(setOf<Long>()) }
     var showTrash by remember { mutableStateOf(false) }
     var collectionName by remember { mutableStateOf("") }
-    var recommendedNovelId by remember { mutableStateOf<Long?>(null) }
     var genreFilter by remember { mutableStateOf<Genre?>(null) }
     var favoriteOnly by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
@@ -434,64 +425,54 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
         expandedNovelId?.let(vm::loadPlatformListings)
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Column { Text("Novel Library", style = MaterialTheme.typography.titleLarge); Text("나만의 이야기 서재", style = MaterialTheme.typography.labelMedium) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
-        },
-    ) { padding ->
-        Column(Modifier.padding(padding).padding(16.dp)) {
-            ElevatedCard(Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = RoundedCornerShape(28.dp)) {
-                Column(Modifier.padding(20.dp)) {
-                    Text(if (showTrash) "휴지통" else "내 서재", style = MaterialTheme.typography.headlineSmall)
-                    Text(if (showTrash) "삭제한 작품 ${trash.size}권" else "이야기 ${count}권", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AssistChip(onClick = {}, label = { Text("컬렉션 ${collections.size}") })
-                        val missingSynopsis = novels.count { it.synopsis.isNullOrBlank() }
-                        AssistChip(onClick = vm::findMissingSynopses, label = { Text("줄거리 대기 $missingSynopsis") })
-                        val pending = candidates.count { it.status.name == "NEEDS_USER_CONFIRMATION" }
-                        if (pending > 0) AssistChip(onClick = {}, label = { Text("확인 필요 $pending") })
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
+        Column(Modifier.padding(padding).padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column {
+                    Text("Novel Library", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        if (showTrash) "휴지통 ${trash.size}권" else "내 서재 · ${count}권",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FilterChip(selected = !showTrash, onClick = { showTrash = false }, label = { Text("서재") })
+                    FilterChip(selected = showTrash, onClick = { showTrash = true; selectedNovelIds = emptySet() }, label = { Text("휴지통") })
+                }
+            }
+
+            val recentJobs = syncJobs.filter { System.currentTimeMillis() - it.createdAt < 10 * 60 * 1000 }
+            val activeJobs = recentJobs.count { it.status.name == "QUEUED" || it.status.name == "RUNNING" }
+            val completedJobs = recentJobs.size - activeJobs
+            val progressPercent = if (recentJobs.isEmpty()) 0 else completedJobs * 100 / recentJobs.size
+            if (operationMessage != null || busyOperation != null || activeJobs > 0) {
+                Card(Modifier.fillMaxWidth().padding(bottom = 6.dp), shape = RoundedCornerShape(14.dp)) {
+                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text(
+                            busyOperation ?: if (activeJobs > 0) "줄거리 검색 중 · 구현율 $progressPercent%" else "작업 결과",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        operationMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                        scanSummary?.let { Text("스캔 · 신규 ${it.inserted}  변경 ${it.changed}  전체 ${it.discovered}", style = MaterialTheme.typography.bodySmall) }
+                        if (busyOperation != null || activeJobs > 0) {
+                            LinearProgressIndicator(
+                                progress = { if (activeJobs > 0) progressPercent / 100f else 0f },
+                                modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                            )
+                            if (busyOperation?.startsWith("TXT") == true) Text("발견 $scanDiscovered 개", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !showTrash, onClick = { showTrash = false }, label = { Text("라이브러리") })
-                FilterChip(selected = showTrash, onClick = { showTrash = true; selectedNovelIds = emptySet() }, label = { Text("휴지통 ${trash.size}") })
-            }
-            if (syncJobs.isNotEmpty()) {
-                val running = syncJobs.count { it.status.name == "RUNNING" || it.status.name == "QUEUED" }
-                val success = syncJobs.count { it.status.name == "SUCCESS" }
-                val failed = syncJobs.count { it.status.name == "FAILED" }
-                Text("플랫폼 작업: 진행 $running · 성공 $success · 실패 $failed")
-            }
-            recommendedNovelId?.let { id ->
-                novels.firstOrNull { it.id == id }?.let { recommended ->
-                    Text("오늘의 추천: ${recommended.confirmedTitle ?: recommended.displayTitle}")
-                }
-            }
-            scanSummary?.let {
-                Text("마지막 스캔: 신규 ${it.inserted}, 변경 ${it.changed}, 동일 ${it.unchanged}, 발견 ${it.discovered}")
-            }
-            operationMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary) }
-            busyOperation?.let { operation ->
-                Text("$operation 진행 중${if (operation.startsWith("TXT")) " · 발견 $scanDiscovered 개" else ""}")
-                LinearProgressIndicator(Modifier.fillMaxWidth())
-            }
-            val recentJobs = syncJobs.filter { System.currentTimeMillis() - it.createdAt < 10 * 60 * 1000 }
-            val activeJobs = recentJobs.count { it.status.name == "QUEUED" || it.status.name == "RUNNING" }
-            if (activeJobs > 0) {
-                val completedJobs = recentJobs.size - activeJobs
-                val fraction = if (recentJobs.isEmpty()) 0f else completedJobs.toFloat() / recentJobs.size
-                Text("플랫폼 검색 진행 $completedJobs/${recentJobs.size}")
-                LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-            }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = { picker.launch(null) }) { Text("TXT 폴더 선택/스캔") }
-                FilledTonalButton(onClick = vm::findMissingSynopses) { Text("줄거리 자동 연결") }
-                FilledTonalButton(onClick = { recommendedNovelId = vm.recommendToday() }) { Text("오늘 뭐 읽지?") }
+
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilledTonalButton(onClick = { picker.launch(null) }) { Text("TXT 스캔") }
+                FilledTonalButton(onClick = vm::findMissingSynopses) { Text("줄거리 찾기") }
                 TextButton(onClick = { showTools = !showTools }) { Text(if (showTools) "도구 닫기" else "백업·설정") }
             }
             if (showTools) {
@@ -553,7 +534,8 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                 },
                 label = { Text("통합 검색") },
                 placeholder = { Text("제목, 작가, 줄거리, 태그를 찾아보세요") },
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(14.dp),
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             if (selectedNovelIds.isNotEmpty()) {
@@ -581,10 +563,10 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                 }
             }
             val visibleNovels = if (showTrash) trash else LibraryFilterEngine.apply(novels, LibraryFilter(genre = genreFilter, favoriteOnly = favoriteOnly))
-            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyColumn(Modifier.weight(1f).padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 items(visibleNovels, key = { it.id }) { novel ->
-                    ElevatedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
-                        Column(Modifier.padding(16.dp)) {
+                    ElevatedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(novel.confirmedTitle ?: novel.displayTitle, style = MaterialTheme.typography.titleMedium)
                                 Text(if (novel.isFavorite) "♥" else "♡")
@@ -605,7 +587,7 @@ fun NovelLibraryApp(vm: LibraryViewModel = viewModel()) {
                                 }) { Text("줄거리 찾아오기") }
                             } else {
                                 Text("줄거리", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                                Text(novel.synopsis, maxLines = if (expandedNovelId == novel.id) 12 else 4)
+                                Text(novel.synopsis, maxLines = if (expandedNovelId == novel.id) 12 else 2, style = MaterialTheme.typography.bodySmall)
                             }
                             syncJobs.firstOrNull { it.novelId == novel.id }?.let { job ->
                                 if (job.status.name == "QUEUED" || job.status.name == "RUNNING") {
